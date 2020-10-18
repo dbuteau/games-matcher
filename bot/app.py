@@ -84,20 +84,6 @@ async def on_member_update(before, after):
         logging.error(err)
 
 
-@bot.command(name='MyTop')
-async def my_list(ctx):
-    """ get list of all games you own """
-    my_games = db.query(Games.name).join(UserGames).filter(UserGames.user_id == ctx.author.id).order_by(UserGames.last_played_at.desc()).limit(20)
-    if my_games.count() > 0:
-        game_list = []
-        for game in my_games.all():
-            logging.info(game.name)
-            game_list.append(game.name)
-        #await ctx.author.send('\n'.join(game_list))
-        await ctx.channel.send('\n'.join(game_list))
-    else:
-        await ctx.channel.send("Sorry i don't have data about you. Try to use import command, or play games i will remember it")
-
 @bot.command(name='import', description='test')
 async def import_games(ctx):
     """ importing your owned games into db """
@@ -153,6 +139,21 @@ async def import_games(ctx):
         await report_error(ctx, err, tb.tb_lineno)
 
 
+@bot.command(name='MyTop')
+async def my_list(ctx):
+    """ get list of all games you own """
+    my_games = db.query(Games.name).join(UserGames).filter(UserGames.user_id == ctx.author.id).order_by(UserGames.last_played_at.desc()).limit(20)
+    if my_games.count() > 0:
+        game_list = []
+        for game in my_games.all():
+            logging.info(game.name)
+            game_list.append(game.name)
+        #await ctx.author.send('\n'.join(game_list))
+        await ctx.channel.send('\n'.join(game_list))
+    else:
+        await ctx.channel.send("Sorry i don't have data about you. Try to use import command, or play games i will remember it")
+
+
 @bot.command()
 async def privacy(ctx):
     """ read what kind of data the bot collect about you """
@@ -183,5 +184,13 @@ async def privacy(ctx):
     """
     await ctx.author.send(text)
 
+
+@bot.command()
+async def delete(ctx):
+    """ delete all data we know about you """
+    query = db.query(UserGames).filter(UserGames.user_id == ctx.author.id).delete()
+    query = db.query(Users).filter(Users.user_id == ctx.author.id).delete()
+    db.commit()
+    await ctx.channel.send('Done! Everything is wiped!')
 
 bot.run(os.environ['DISCORD_TOKEN'])
