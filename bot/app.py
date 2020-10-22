@@ -60,10 +60,10 @@ async def on_member_update(before, after):
         if not after.bot and after.activity:
             activity = after.activity
             if after.activity.type == discord.ActivityType.playing:
-                query = db.query(Games).filter(Games.name == activity.name)
+                query = db.query(Games).filter(Games.name == activity.name.lower())
                 if query.count() == 0:
                     # add the game to database
-                    oGames = Games(name=activity.name, application_id=activity.application_id)
+                    oGames = Games(name=activity.name.lower(), application_id=activity.application_id)
                     db.add(oGames)
                     db.commit()
                     db.refresh(oGames)
@@ -116,13 +116,15 @@ async def import_games(ctx):
             row_objects = []
             row_number = 0
             for line in attached_file.split(b'\n'):
-                game_name = line.decode('Windows-1252').rstrip().replace('_', ' ').lower()
+                line = line.decode('Windows-1252')
+                name, activity = line.split(b',')
+                game_name = name.rstrip().replace('_', ' ').lower()
                 query = db.query(Games).filter(Games.name == game_name)
                 if query.count() == 1:
                     oGames = query.one()
                     oGamesOwned = db.query(UserGames).filter(UserGames.game_id == oGames.game_id, UserGames.user_id == ctx.author.id)
                     if oGamesOwned.count() == 0:
-                        uGame = UserGames(game_id=oGames.game_id, user_id=ctx.author.id)
+                        uGame = UserGames(game_id=oGames.game_id, user_id=ctx.author.id, last_played_at=activity)
                         duplicate = False
                         for row in row_objects:
                             if uGame.game_id == row.game_id and uGame.user_id == row.user_id:
@@ -155,6 +157,29 @@ async def my_list(ctx):
 
 
 @bot.command()
+async def match(ctx, arg):
+    """ Found 20th games in common ordered by last activity """
+    """ TODO """
+    pass
+
+
+@bot.command()
+async def find(ctx, arg):
+    """ find 20 member which own the game """
+    member_list = []
+    users = db.query(UserGames.user_id).join(Games).filter(Games.name == arg.lower()).all()
+    for user in users:
+        if not user.user_id == ctx.author.id:
+            member = discord.utils.find(lambda m: m.id == user.user_id, ctx.author.channel.guild.members)
+            if member:
+                member_list.append(member.display_name)
+    if len(member_list) > 0:
+        await ctx.author.send('\n'.join(member_list))
+    else:
+        await ctx.author.send('No one found on the server')
+
+
+@bot.command()
 async def privacy(ctx):
     """ read what kind of data the bot collect about you """
     text = """**Data we collect**
@@ -170,17 +195,17 @@ async def privacy(ctx):
     **Why the bot collect your gaming activity?**
     For two reasons:
         - Populate our database games list with games we don't know.
-        When you use delete command, this data will not be deleted because this data are not tied to you, it's anonymously registered in our data.
-        - Auto complete your list of owned game. When you use the delete command, this datas are deleted
+        When you use delete command, this data will not be deleted because this data are not tied to you, it's anonymously registered in our database.
+        - Auto complete your list of owned game. When you use the delete command, this datas are deleted. You can avoid this collect using `disallow` command
 
     **I want bot forget about me. How i do that?**
     1/ First use `delete` command to erase our database from data we know about you
     2/ then use `disallow` command saying bot to stop collecting your playing activity.
-    Unfortunatly, to remember you don't want bot collect data about you we need at minimum your discord_id, but it's all we will keep from you.
+    Unfortunatly, to remember than you don't want bot collect data about you we need at minimum your discord_id, but it's all we will keep from you.
 
     **Warnings :**
         - `delete` command delete all your privacy configuration, the fact you disallowed or blocked members will be erased. Disallowing before delete is useless.
-        - `delete` command delete all data about you, cross server or guild. So if you delete on server X, your datas will be erase for all other servers too.
+        - `delete` command delete all data about you, cross server or guild. So if you delete on server X, your datas will be erased for all other servers too.
     """
     await ctx.author.send(text)
 
@@ -192,5 +217,32 @@ async def delete(ctx):
     query = db.query(Users).filter(Users.user_id == ctx.author.id).delete()
     db.commit()
     await ctx.channel.send('Done! Everything is wiped!')
+
+
+@bot.command()
+async def disallow(ctx):
+    """ the bot stop to listen your activity """
+    query = db.query(Users).get(ctx.author.id).one()
+    if query.disallow_globally:
+        oUser = Users(disallow_globally=False)
+        await ctx.channel.send('Your Activity collect is now reactivated')
+    else:
+        oUser = Users(disallow_globally=True)
+        await ctx.channel.send('Your Activity collect is now disallowed')
+    db.commit()
+
+
+@bot.command()
+async def block(ctx, arg):
+    """ block the user to aks for your game owned """
+    """ TODO """
+    pass
+
+
+@bot.command()
+async def unblock(ctx, arg):
+    """ unblock the user you previously blocked """
+    """ TODO """
+    pass
 
 bot.run(os.environ['DISCORD_TOKEN'])

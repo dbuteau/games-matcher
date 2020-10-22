@@ -31,7 +31,6 @@ class Users(Base):
     __tablename__ = "Users"
     user_id = Column(Integer, primary_key=True)
     disallow_globally = Column(Boolean, default=False)
-    disallow_guilds = Column(UnicodeText, default=None)
     disallow_users = Column(UnicodeText, default=None)
 
 
