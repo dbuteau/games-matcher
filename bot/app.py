@@ -48,6 +48,7 @@ async def report_error(ctx, arg, line=0):
 @bot.event
 async def on_ready():
     """ create server config if not already exist """
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="{}help".format(default_prefix)))
     my_guilds = bot.guilds
     for guild in my_guilds:
         me_onguild = guild.me
