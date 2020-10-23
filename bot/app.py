@@ -13,6 +13,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Users, Games, UserGames, Servers, Base
 
+version = '0.0.1'
+default_prefix = '$'
+
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 engine = create_engine('sqlite:///games-matcher-bot.db')
@@ -24,7 +27,7 @@ intents = discord.Intents.default()
 intents.presences = True
 intents.members = True
 intents.typing = False
-bot = commands.Bot('$', intents=intents)
+bot = commands.Bot(default_prefix, intents=intents)
 
 # Init Error messages
 MESSAGES = {
@@ -84,19 +87,38 @@ async def on_member_update(before, after):
         logging.error(err)
 
 
+def extract_from_file(attached_file):
+    rows = []
+    for line in attached_file.split(b'\n'):
+        # convert non utf8 chars
+        line = line.decode('Windows-1252')
+        # the line should contain only one ; if not there is a problem
+        if line.count(';') > 1:
+            logging.error("This fucking game name contain ';': {0}".format(line))
+            return False
+        name, activity = line.split(';')
+        game_name = name.rstrip().replace('_', ' ').lower()
+        activity = activity.rstrip()
+        if activity != 'None':
+            activity = datetime.datetime.strptime(activity, '%d/%m/%Y %H:%M:%S')
+        else:
+            activity = None
+        rows.append({'name': game_name, 'activity': activity})
+    return rows
+
+
 @bot.command(name='import', description='test')
 async def import_games(ctx):
-    """ importing your owned games into db """
+    """ importing your owned games into db. Attache the csv file to your command."""
     try:
         if ctx.message.attachments:
             attached_file = await ctx.message.attachments[0].read()
+            rows = extract_from_file(attached_file)
             row_objects = []
-            row_number = 0
-            for line in attached_file.split(b'\n'):
-                game_name = line.decode('Windows-1252').rstrip().replace('_', ' ').lower()
-                query = db.query(Games).filter(Games.name == game_name)
+            for row in rows:
+                query = db.query(Games).filter(Games.name == row['name'])
                 if query.count() == 0:
-                    oGame = Games(name=game_name)
+                    oGame = Games(name=row['name'])
                     # check if we don't try to duplicate in the same request
                     duplicate = False
                     for row in row_objects:
@@ -105,43 +127,50 @@ async def import_games(ctx):
                     # add the game to database
                     if not duplicate:
                         row_objects.append(oGame)
-                        row_number += 1
                 elif query.count() > 1:
                     raise RuntimeError('Duplicate game')
             # need to commit at end all in once bc of harddisk write limitations
             db.bulk_save_objects(row_objects)
             db.commit()
-            await ctx.author.send('{0} games unknown added to our base.'.format(row_number))
+            await ctx.author.send('{0} games unknown added to our base.'.format(len(row_objects)))
 
             row_objects = []
-            row_number = 0
-            for line in attached_file.split(b'\n'):
-                line = line.decode('Windows-1252')
-                name, activity = line.split(b',')
-                game_name = name.rstrip().replace('_', ' ').lower()
-                query = db.query(Games).filter(Games.name == game_name)
+            for row in rows:
+                query = db.query(Games).filter(Games.name == row['name'])
                 if query.count() == 1:
                     oGames = query.one()
                     oGamesOwned = db.query(UserGames).filter(UserGames.game_id == oGames.game_id, UserGames.user_id == ctx.author.id)
                     if oGamesOwned.count() == 0:
-                        uGame = UserGames(game_id=oGames.game_id, user_id=ctx.author.id, last_played_at=activity)
+                        uGame = UserGames(game_id=oGames.game_id, user_id=ctx.author.id, last_played_at=row['activity'])
                         duplicate = False
                         for row in row_objects:
-                            if uGame.game_id == row.game_id and uGame.user_id == row.user_id:
+                            if row.game_id == uGame.game_id and row.user_id == uGame.user_id:
                                 duplicate = True
+                        logging.error('duplicate is defined to {}'.format(str(duplicate)))
                         if not duplicate:
                             row_objects.append(uGame)
-                            row_number += 1
-            db.bulk_save_objects(row_objects)
-            db.commit()
-            await ctx.author.send('{0} games linked to your account'.format(row_number))
-
+                elif query.count() > 1:
+                    raise RuntimeError(query.all()[0].name)
+            if len(row_objects) > 0:
+                db.bulk_save_objects(row_objects)
+                db.commit()
+            await ctx.author.send('%s games linked to your account' % len(row_objects))
+        else:
+            ctx.channel.send('You forget to attach file to your command')
+    except RuntimeError as err:
+        logging.error('Duplicates are detected in DATABASE: %s' % err)
+    except ValueError as err:
+        exc_type, exc_obj, tb = sys.exc_info()
+        logging.error(tb.tb_lineno, err)
+        if err == 'too many values to unpack':
+            logging.error('Too many values to unpack')
+            await ctx.channel.send('It seems than your file have game name with semi-colon in it, try to delete this char from the name. A report of this problem was raise at bot owner')
     except Exception as err:
         exc_type, exc_obj, tb = sys.exc_info()
         await report_error(ctx, err, tb.tb_lineno)
 
 
-@bot.command(name='MyTop')
+@bot.command(name='mytop')
 async def my_list(ctx):
     """ get list of all games you own """
     my_games = db.query(Games.name).join(UserGames).filter(UserGames.user_id == ctx.author.id).order_by(UserGames.last_played_at.desc()).limit(20)
@@ -153,21 +182,32 @@ async def my_list(ctx):
         #await ctx.author.send('\n'.join(game_list))
         await ctx.channel.send('\n'.join(game_list))
     else:
-        await ctx.channel.send("Sorry i don't have data about you. Try to use import command, or play games i will remember it")
+        await ctx.channel.send(
+            "Sorry i don't have data about you. Try to import games from file, or play games i will remember it. Type `{0}help` command for more informations"
+            .format(default_prefix))
 
 
 @bot.command()
-async def match(ctx, arg):
+async def match(ctx, member: discord.Member):
     """ Found 20th games in common ordered by last activity """
     """ TODO """
-    pass
+    your_games = db.query(Games, UserGames).filter(UserGames.user_id == ctx.author.id)
+    his_games = db.query(Games, UserGames).filter(UserGames.user_id == member.id)
+    common_games = your_games.union(his_games)
+    query4 = db.query(Games).join(common_games).order_by(UserGames.last_played_at.desc()).limit(20).all
+    games_list = []
+    for game in query4:
+        games_list.append(game.name)
+    msg = '{0} and you have this games in common:\n'.format(member.display_name)
+    msg += '\n'.join(games_list)
+    await ctx.author.send(msg)
 
 
 @bot.command()
-async def find(ctx, arg):
+async def find(ctx, game_name):
     """ find 20 member which own the game """
     member_list = []
-    users = db.query(UserGames.user_id).join(Games).filter(Games.name == arg.lower()).all()
+    users = db.query(UserGames.user_id).join(Games).filter(Games.name == game_name.lower()).all()
     for user in users:
         if not user.user_id == ctx.author.id:
             member = discord.utils.find(lambda m: m.id == user.user_id, ctx.author.channel.guild.members)
@@ -233,16 +273,28 @@ async def disallow(ctx):
 
 
 @bot.command()
-async def block(ctx, arg):
+async def block(ctx, member: discord.Member):
     """ block the user to aks for your game owned """
     """ TODO """
     pass
 
 
 @bot.command()
-async def unblock(ctx, arg):
+async def unblock(ctx, member: discord.Member):
     """ unblock the user you previously blocked """
     """ TODO """
     pass
+
+@bot.command()
+async def infos(ctx):
+    """ Get versions, github and support link """
+    ctx.channel.send(
+        """
+        Games-Matcher v{0}
+        source: https://github.com/dbuteau/games-matcher
+        support: https://github.com/dbuteau/games-matcher/issues
+        """
+        .format(version)
+    )
 
 bot.run(os.environ['DISCORD_TOKEN'])
