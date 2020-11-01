@@ -52,8 +52,7 @@ async def on_ready():
     my_guilds = bot.guilds
     for guild in my_guilds:
         me_onguild = guild.me
-        logging.debug(me_onguild)
-    logging.info('logged in as {0.user}'.format(bot))
+        logging.info("connected to {} as {}" % (guild.name, me_onguild))
 
 
 @bot.event
@@ -63,6 +62,7 @@ async def on_member_update(before, after):
     try:
         if not after.bot and after.activity:
             activity = after.activity
+            logging.info('detected @{} on {}'.format(after.id, activity.name))
             if after.activity.type == discord.ActivityType.playing:
                 query = db.query(Games).filter(Games.name == activity.name.lower())
                 if query.count() == 0:
@@ -84,6 +84,7 @@ async def on_member_update(before, after):
                     oGamesOwned = query.one()
                     oGamesOwned.last_played_at = datetime.datetime.utcnow()
                     db.commit()
+                logging.info("@{} added {}".format(after.id, activity.name.lower()))
     except Exception as err:
         logging.error(err)
 
@@ -289,11 +290,11 @@ async def unblock(ctx, member: discord.Member):
 @bot.command()
 async def infos(ctx):
     """ Get versions, github and support link """
-    ctx.channel.send(
+    await ctx.channel.send(
         """
-        Games-Matcher v{0}
-        source: https://github.com/dbuteau/games-matcher
-        support: https://github.com/dbuteau/games-matcher/issues
+Games-Matcher v{0},
+informations and support: https://github.com/dbuteau/games-matcher
+You can offer me a beer as thank via <https://paypal.me/DanielButeau>
         """
         .format(version)
     )
