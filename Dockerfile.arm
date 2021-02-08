@@ -6,6 +6,7 @@ RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install discord.py
 RUN python3 -m pip install DiscordUtils
 RUN python3 -m pip install SQLAlchemy
+RUN python3 -m pip install requests
 
 COPY bot /
 

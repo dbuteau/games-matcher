@@ -12,13 +12,15 @@ import discord
 import DiscordUtils
 from discord.ext import commands
 from cogs import matcher, gImport, privacy
-from libs.models import Users, Games, UserGames, Servers, Base, WhosUp
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
+from libs.models import Users, Games, UserGames, Servers, Base, WhosUp
+from  libs.interntools import interntools
 
 fo = open("version", "r")
 version = fo.readline()
-default_prefix = '$'
+
+default_prefix = '$gm:'
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -91,11 +93,12 @@ async def on_guild_join(self, guild):
 async def on_member_update(before, after):
     """ listening when user is playing game """
     try:
+        logging.info(f'Detected activity of {after.id}')
         if not after.bot and after.activity:
             activity = after.activity
             logging.info('detected @{} on {}'.format(after.id, activity.name))
             if after.activity.type == discord.ActivityType.playing:
-                query = db.query(Games).filter(Games.name == activity.name.lower())
+                query = db.query(Games).filter(or_(Games.name == activity.name.lower(),Games.discord_id == activity.application_id))
                 if query.count() == 0:
                     # add the game to database
                     oGames = Games(name=activity.name.lower(), discord_id=activity.application_id)
@@ -106,6 +109,9 @@ async def on_member_update(before, after):
                     raise RuntimeError('Duplicate game')
                 else:
                     oGames = query.one()
+                    oGames.discord_id=activity.application_id
+                    db.commit()
+                    db.refresh(oGames)
 
                 query = db.query(UserGames).filter(UserGames.game_id == oGames.game_id, UserGames.user_id == after.id)
                 if query.count() == 0:
@@ -132,5 +138,10 @@ You can offer me a beer as thank via <https://paypal.me/DanielButeau>
         """
         .format(version)
     )
+
+@bot.command()
+async def test_paginator(ctx):
+    listing = ['un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf','vingt','vingt et un']
+    await internTools.paginate(ctx, listing)
 
 bot.run(os.environ['DISCORD_TOKEN'])

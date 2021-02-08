@@ -19,6 +19,9 @@ We don't care of everything else.
 * $steam <steamId>  # importing games from steam with your steamID (only in private message)
 * $help             # Shows list of commands
 ```
+# How to made join the bot to your guild server
+just click on the link below:
+https://discord.com/api/oauth2/authorize?client_id=765820610830925864&permissions=11328&scope=bot
 
 # For Hosts
 For connecting the bot to discord you need a discord token see [here](https://www.writebots.com/discord-bot-token/)
