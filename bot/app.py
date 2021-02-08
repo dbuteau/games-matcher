@@ -32,7 +32,14 @@ intents.presences = True
 intents.members = True
 intents.typing = False
 
-bot = commands.Bot(command_prefix=determine_prefix, intents=intents)
+async def determine_prefix(bot, message):
+    query = db.query(Servers).filter(server_id=guild.id)
+    if query.count() > 0:
+        return query.one().prefix
+    else:
+        return default_prefix
+
+bot = commands.Bot(command_prefix=default_prefix, intents=intents)
 bot.add_cog(matcher.Functions(bot,db))
 bot.add_cog(gImport.Import(bot,db))
 #bot.add_cog(privacy.Privacy(bot,db))
@@ -52,35 +59,20 @@ async def report_error(ctx, arg, line=0):
     owner = (await bot.application_info()).owner
     await owner.send(MESSAGES['HEY'].format(bot, datetime.datetime.now().strftime('%B %d %Y - %H:%M:%S')))
 
-async def determine_prefix(bot, message):
-    query = db.query(Servers).filter(server_id=guild.id)
-    if query.count() > 0:
-        return query.one().prefix
-    else:
-        return default_prefix
-
-@bot.command(pass_context=True)
-@commands.has_permissions(administrator=True)
-async def setprefix(ctx, new_prefix):
-    query = db.query(Servers).filter(server_id=guild.id)
-    oServer = query.one()
-    oServer.prefix = new_prefix
-    db.commit()
-
 @bot.event
 async def on_ready():
     """ create server config if not already exist """
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="{}help".format(determine_prefix)))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="{}help".format(default_prefix)))
     my_guilds = bot.guilds
     for guild in my_guilds:
         me_onguild = guild.me
         logging.info(f"connected to {guild.name} as {me_onguild}")
 
-@bot.event()
+@bot.event
 async def on_guild_join(self, guild):
     """ on join add default config for guild """
     query = db.query(Servers).filter(server_id=guild.id)
-    if query.count() = 0:
+    if query.count() == 0:
         oServer = Servers(server_id=guild.id,prefix='$')
         db.add(oServer)
         db.commit()
