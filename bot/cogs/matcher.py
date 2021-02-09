@@ -65,7 +65,7 @@ class Functions(commands.Cog):
         else:
             await ctx.channel.send(f"{header}{nl}{footer}")
 
-    @commands.command(hidden=True)
+    @commands.command()
     @commands.guild_only()
     async def match(self, ctx, member: discord.Member):
         """ Found games in common with <member> ordered by last activity """
@@ -85,7 +85,6 @@ class Functions(commands.Cog):
             await interntools.paginate(ctx, commons_games, header=header)
         else:
             await ctx.channel.send('No games in common found')
-
 
 
     @commands.command()
