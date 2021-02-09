@@ -33,6 +33,7 @@ intents = discord.Intents.default()
 intents.presences = True
 intents.members = True
 intents.typing = False
+intents.guild_messages = True
 
 async def determine_prefix(bot, message):
     query = db.query(Servers).filter(server_id=guild.id)
@@ -44,7 +45,8 @@ async def determine_prefix(bot, message):
 bot = commands.Bot(command_prefix=default_prefix, intents=intents)
 bot.add_cog(matcher.Functions(bot,db))
 bot.add_cog(gImport.Import(bot,db))
-#bot.add_cog(privacy.Privacy(bot,db))
+bot.add_cog(privacy.Privacy(bot,db))
+
 
 # Init Error messages
 MESSAGES = {
@@ -53,7 +55,6 @@ MESSAGES = {
     'NO_DATA': "Sorry i don't have data about {0.user}",
     'NOT_IMPLEMENTED': 'Sorry but this command is not yet implemented'
 }
-
 
 async def report_error(ctx, arg, line=0):
     logging.error(line, arg)
@@ -82,7 +83,7 @@ async def on_guild_join(self, guild):
     prefix = query.one().prefix
     """ on join add default config for user in guild """
     for member in guild.fetch_members:
-        query = db.query(Users).filter(user_id=member)
+        query = db.query(Users).filter(user_id == member.id)
         # If the user doesn't already exist in db, add it
         if query.count() == 0:
             oUser = Users(user_id=member.id,disallow_globally=False,disallow_users=None)
@@ -113,15 +114,18 @@ async def on_member_update(before, after):
                     db.commit()
                     db.refresh(oGames)
 
-                query = db.query(UserGames).filter(UserGames.game_id == oGames.game_id, UserGames.user_id == after.id)
-                if query.count() == 0:
-                    db.add(UserGames(game_id=oGames.game_id, user_id=after.id))
-                    db.commit()
-                else:
-                    oGamesOwned = query.one()
-                    oGamesOwned.last_played_at = datetime.datetime.utcnow()
-                    db.commit()
-                logging.info("@{} added {}".format(after.id, activity.name.lower()))
+                # we don't save the fact than this user own the game if he didn't allow bot to do it
+                query = db.query(Users).filter(Users.user_id).one()
+                if not query.disallow_globally:
+                    query = db.query(UserGames).filter(UserGames.game_id == oGames.game_id, UserGames.user_id == after.id)
+                    if query.count() == 0:
+                        db.add(UserGames(game_id=oGames.game_id, user_id=after.id))
+                        db.commit()
+                    else:
+                        oGamesOwned = query.one()
+                        oGamesOwned.last_played_at = datetime.datetime.utcnow()
+                        db.commit()
+                    logging.info("@{} added {}".format(after.id, activity.name.lower()))
     except Exception as err:
         logging.error(err)
 
@@ -138,10 +142,5 @@ You can offer me a beer as thank via <https://paypal.me/DanielButeau>
         """
         .format(version)
     )
-
-@bot.command()
-async def test_paginator(ctx):
-    listing = ['un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf','vingt','vingt et un']
-    await internTools.paginate(ctx, listing)
 
 bot.run(os.environ['DISCORD_TOKEN'])
