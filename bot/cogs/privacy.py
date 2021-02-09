@@ -10,9 +10,9 @@ class Privacy(commands.Cog):
         self.bot = bot
         self.db = db
 
-    @commands.group(pass_context=True, cog_name='Privacy', description='`help privacy` for more infos1')
+    @commands.group(pass_context=True, cog_name='Privacy')
     async def privacy(self, ctx):
-        """ `help privacy` for more infos2 """
+        """ `help privacy` for more infos """
         nl = "\n"
         if isinstance(ctx.channel, discord.channel.DMChannel):
             if ctx.invoked_subcommand is None:
@@ -56,22 +56,27 @@ class Privacy(commands.Cog):
     @privacy.command()
     async def disallow(self, ctx):
         """ the bot stop to listen your activity """
-        oUser = self.db.query(Users).get(ctx.author.id).one()
+        query = self.db.query(Users).filter(Users.user_id == ctx.author.id)
+        oUser = query.one()
         if oUser.disallow_globally:
             oUser.disallow_globally = False
             await ctx.channel.send('Your Activity collect is now reactivated')
         else:
             oUser.disallow_globally = True
             await ctx.channel.send('Your Activity collect is now disallowed')
-        db.commit()
+        self.db.commit()
 
     @privacy.command()
     async def block(self, ctx, member: discord.Member = None):
-        pass
+        oUser = self.db.query(Users).filter(Users.user_id == ctx.author.id).one()
+        oUser.disallow_users.append(member.id)
+        self.db.commit()
 
     @privacy.command()
     async def unblock(self, ctx, member: discord.Member = None):
-        pass
+        oUser = self.db.query(Users).filter(Users.user_id == ctx.author.id).one()
+        oUser.disallow_users.remove(member.id)
+        self.db.commit()
 
     @privacy.command()
     async def delete(self, ctx):
