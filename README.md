@@ -15,7 +15,7 @@ We don't care of everything else.
                     # show a list of 10(max) common games upped people have in common (ordered by last activity)
                     # The result of this command will be publicly displayed on the channel
 * find "game name" # find online members on the server which own the game. (result will be sent to you in private)
-* match @user      # (not ready) Found games in common with the user, ordered by last activity. (result will be sent to you in private)
+* match @user      # Found games in common with the user, ordered by last activity. (result will be sent to you in private)
 * import
 ** steam <steamId> # importing games from steam with your steamID (only in private message)
 * privacy           # Only private message commands for control how the bot interact with your data
