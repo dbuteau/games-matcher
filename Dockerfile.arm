@@ -1,10 +1,13 @@
-FROM python:3.7-slim-buster
+FROM arm32v7/python:3.9-alpine
 
-COPY bot /
-
+RUN apk add python3-dev gcc musl-dev libffi-dev make
 RUN python3 -m ensurepip --default-pip
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install discord.py
+RUN python3 -m pip install DiscordUtils
 RUN python3 -m pip install SQLAlchemy
+RUN python3 -m pip install requests
+
+COPY bot /
 
 ENTRYPOINT ["python3", "app.py"]

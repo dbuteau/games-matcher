@@ -1,8 +1,0 @@
-{
-    "name": "games-matcher",
-    "version": "1.0.0",
-    "description": "Found commons games between users",
-    "main": "app.py",
-    "author": "Daniel BUTEAU",
-    "dependencies": {}
-}
