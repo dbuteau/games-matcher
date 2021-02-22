@@ -3,10 +3,7 @@ FROM arm32v7/python:3.9-alpine
 RUN apk add python3-dev gcc musl-dev libffi-dev make
 RUN python3 -m ensurepip --default-pip
 RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install discord.py
-RUN python3 -m pip install DiscordUtils
-RUN python3 -m pip install SQLAlchemy
-RUN python3 -m pip install requests
+RUN python3 -m pip install -r requirements.txt 
 
 COPY bot /
 
