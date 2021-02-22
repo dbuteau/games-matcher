@@ -20,11 +20,11 @@ from  libs.interntools import interntools
 fo = open("version", "r")
 version = fo.readline()
 
-default_prefix = '$gm:'
+default_prefix = '$'
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-engine = create_engine('sqlite:///games-matcher-bot.db')
+engine = create_engine('sqlite:///data/games-matcher-bot.db')
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 db = Session()
