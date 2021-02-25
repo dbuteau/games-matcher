@@ -21,7 +21,7 @@ from  libs.interntools import interntools
 fo = open("version", "r")
 version = fo.readline()
 
-default_prefix = '!dev:'
+default_prefix = '$'
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
