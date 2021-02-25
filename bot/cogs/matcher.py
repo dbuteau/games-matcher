@@ -106,7 +106,7 @@ class Functions(commands.Cog):
                 Gamer which own "{game_name.lower()}" {len(member_list)}
                 {'{nl}'.join(member_list)}
                 """
-                await ctx.author.send(msg)
+                await ctx.channel.send(msg)
             else:
                 games = self.db.query(Games.name).filter(Games.name.ilike(f'%{game_name[0:4]}%')).limit(4).all()
                 alternate_games = []
@@ -115,9 +115,9 @@ class Functions(commands.Cog):
                         alternate_games.append(game.name)
                 flat_games = ', '.join(alternate_games)
                 msg = f"No one on the server own '{game_name}'"
-                if len(alternate_games)>0:
+                if len(alternate_games) > 0:
                     msg += f", \nwould you mean: {flat_games}"
-                await ctx.author.send(msg)
+                await ctx.channel.send(msg)
         except commands.NoPrivateMessage :
             await ctx.author.send("This command need to be send in guild channel only, not in private message")
             pass
