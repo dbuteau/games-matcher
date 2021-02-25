@@ -68,23 +68,30 @@ class Functions(commands.Cog):
     @commands.command()
     @commands.guild_only()
     async def match(self, ctx, member: discord.Member):
-        """ Found games in common with <member> ordered by last activity """
-        query_result1 = self.db.query(Games.name).join(UserGames).filter(Games.game_id == UserGames.game_id, UserGames.user_id == ctx.author.id).all()
-        query_result2 = self.db.query(Games.name).join(UserGames).filter(Games.game_id == UserGames.game_id, UserGames.user_id == member.id).all()
-        your_games = []
-        for game in query_result1:
-            logging.info(game.name)
-            your_games.append(game.name)
-        his_games = []
-        for game in query_result2:
-            his_games.append(game.name)
-        commons_games = list(set(your_games).intersection(his_games))
-        logging.info(f'found {len(commons_games)} games in common')
-        if len(commons_games) > 0:
-            header = '{0} and you have {1} games in common:'.format(member.display_name,len(commons_games))
-            await interntools.paginate(ctx, commons_games, header=header)
-        else:
-            await ctx.channel.send('No games in common found')
+        try:
+            logging.info(f'try to found common game between {ctx.author.id} and {member.id}')
+            """ Found games in common with <member> ordered by last activity """
+            query_result = self.db.query(Games.name).join(UserGames).filter(Games.game_id == UserGames.game_id, UserGames.user_id == ctx.author.id ).all()
+            your_games = []
+            for game in query_result:
+                your_games.append(game.name)
+
+            query_result = self.db.query(Games.name).join(UserGames).filter(Games.game_id == UserGames.game_id, UserGames.user_id == member.id ).all()
+            his_games = []
+            for game in query_result:
+                his_games.append(game.name)
+            logging.info(f'your_games: {your_games}, his_games: {his_games}')
+
+            commons_games = list(set(your_games).intersection(his_games))
+            logging.info(f'common games: {commons_games}')
+
+            if len(commons_games) > 0:
+                header = '{0} and you have {1} games in common:'.format(member.display_name,len(commons_games))
+                await interntools.paginate(ctx, commons_games, header=header)
+            else:
+                await ctx.channel.send('No games in common found')
+        except Exception as err:
+            logging.info(f'Match command raised and exception; {err}')
 
 
     @commands.command()
@@ -119,3 +126,5 @@ class Functions(commands.Cog):
         except commands.NoPrivateMessage :
             await ctx.author.send("This command need to be send in guild channel only, not in private message")
             pass
+        except Exception as err:
+            logging.info(f'Match command raised and exception; {err}')

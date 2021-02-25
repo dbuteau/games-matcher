@@ -18,10 +18,19 @@ class Import(commands.Cog):
 
     @commands.command()
     @commands.max_concurrency(1, per=BucketType.default, wait=True)
-    #@commands.dm_only()
+    @commands.dm_only()
     async def steam(self, ctx, user_steam_id):
         """ Import your steam library (send direct message to bot)"""
         try:
+            logging.info(f'start Import of steam lib for {ctx.author.id}')
+            if not user_steam_id:
+                await ctx.author.send('steam_id is a required argument that is missing.')
+                return False
+            if not isinstance(ctx.channel, discord.channel.DMChannel):
+                await ctx.author.send('the steam command must be send by private message')
+                await ctx.message.delete()
+                return False
+
             api = Steam(os.environ['STEAM_API_KEY'])
             raw_data = api.get_User_Owned_Games(user_steam_id)
             await ctx.author.send(f"We found {raw_data['response']['game_count']} games in your lib, it will take some time for extract infos from steam without get banned. Get you a coffee")
@@ -34,6 +43,7 @@ class Import(commands.Cog):
                 query = self._db.query(Games).filter(or_(Games.steam_id == oGame.steam_id, Games.name == oGame.name))
 
                 # if we miss some game info, then we ask steam store for it, warning the api is very sensible to 'too much request'
+                gameInfos = None
                 if query.count() == 0 or (query.count() == 1 and query.one().multiplayer is None):
                     await asyncio.sleep(1)
                     gameInfos = api.get_game_info_from_store(oGame.steam_id)
@@ -45,13 +55,12 @@ class Import(commands.Cog):
                                 if category['id'] in (1,9):
                                     logging.info('multiplayer detected')
                                     oGame.multiplayer = True
-
                 if query.count() == 0:
                     # insert into db if not exist
                     logging.info(f"add {oGame.name} game to database")
                     self._db.add(oGame)
                     self._db.commit()
-                elif query.count() == 1:
+                elif query.count() == 1 and (gameInfos is not None):
                     gameindb = query.one()
                     gameindb.steam_id = oGame.steam_id
                     gameindb.multiplayer = oGame.multiplayer
@@ -82,5 +91,6 @@ class Import(commands.Cog):
             await ctx.author.send(f"{oGame.name} - {err}")
             pass
         except Exception as err:
+            logging.info(f'{err}')
             raise Exception from err
 

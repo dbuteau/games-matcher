@@ -21,7 +21,7 @@ from  libs.interntools import interntools
 fo = open("version", "r")
 version = fo.readline()
 
-default_prefix = '$'
+default_prefix = '!dev:'
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -64,16 +64,20 @@ async def report_error(ctx, arg, line=0):
     await owner.send(MESSAGES['HEY'].format(bot, datetime.datetime.now().strftime('%B %d %Y - %H:%M:%S')))
 
 @bot.event
-async def on_command_error(ctx,error):
-    await ctx.message.delete()
+async def on_command_error(ctx, error):
     if isinstance(error, commands.MaxConcurrencyReached):
         await ctx.author.send('Bot is busy! Please retry in a minute')
         return
     else:
-        await ctx.author.send("Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient.")
+        await ctx.author.send(f"Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient. {error}")
         owner = (await bot.application_info()).owner
-        await owner.send(error)
+        await owner.send(f'{error}')
+    if not isinstance(ctx.channel, discord.channel.DMChannel):
+        await ctx.message.delete()
 
+@bot.command()
+async def debug(ctx):
+    await ctx.author.send(f'your discord id is: {ctx.author.id}')
 
 @bot.event
 async def on_ready():
@@ -142,11 +146,11 @@ async def on_member_update(before, after):
                     if query.count() == 0:
                         db.add(UserGames(game_id=oGames.game_id, user_id=after.id))
                         db.commit()
-                    else:
+                        logging.info("@{} added {}".format(after.id, activity.name.lower()))
+                        """else: bugged
                         oGamesOwned = query.one()
                         oGamesOwned.last_played_at = datetime.datetime.utcnow()
-                        db.commit()
-                    logging.info("@{} added {}".format(after.id, activity.name.lower()))
+                        db.commit()"""
     except Exception as err:
         logging.error(err)
 
