@@ -68,6 +68,9 @@ async def on_command_error(ctx,error):
     if isinstance(error, commands.MaxConcurrencyReached):
         await ctx.author.send('Bot is busy! Please retry in a minute')
         return
+    else:
+        owner = (await bot.application_info()).owner
+        await owner.send(error)
 
 
 @bot.event
