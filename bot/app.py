@@ -10,6 +10,7 @@ import logging
 import json
 import discord
 import DiscordUtils
+import asyncio
 from discord.ext import commands
 from discord.user import User
 from cogs import matcher, gImport, privacy
@@ -17,6 +18,7 @@ from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
 from libs.models import Users, Games, UserGames, Servers, Base, WhosUp
 from  libs.interntools import interntools
+from libs.steam import Steam
 
 fo = open("version", "r")
 version = fo.readline()
@@ -78,6 +80,30 @@ async def on_command_error(ctx, error):
 @bot.command()
 async def debug(ctx):
     await ctx.author.send(f'your discord id is: {ctx.author.id}')
+
+@bot.command()
+async def forceupdate(ctx):
+    try:
+        owner = (await bot.application_info()).owner
+        if ctx.author.id == owner.id:
+            query = db.query(Games)
+            logging.info(query.count())
+            if query.count()>0:
+                for oGame in query.all():
+                    if oGame.steam_id:
+                        api = Steam(os.environ['STEAM_API_KEY'])
+                        await asyncio.sleep(1)
+                        gameInfos = api.get_game_info_from_store(oGame.steam_id)
+                        if gameInfos is not None:
+                            if 'categories' in gameInfos:
+                                for category in gameInfos['categories']:
+                                    if category['id'] in (1,9):
+                                        logging.info('multiplayer detected')
+                                        oGame.multiplayer = True
+        else:
+            ctx.author.send('your are not owner of the bot... GFY!')
+    except Exception as err:
+        logging.error(err)
 
 @bot.event
 async def on_ready():
