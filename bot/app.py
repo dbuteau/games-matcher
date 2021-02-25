@@ -11,6 +11,7 @@ import json
 import discord
 import DiscordUtils
 from discord.ext import commands
+from discord.user import User
 from cogs import matcher, gImport, privacy
 from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
@@ -69,6 +70,7 @@ async def on_command_error(ctx,error):
         await ctx.author.send('Bot is busy! Please retry in a minute')
         return
     else:
+        await ctx.author.send("Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient.")
         owner = (await bot.application_info()).owner
         await owner.send(error)
 
@@ -126,8 +128,16 @@ async def on_member_update(before, after):
                     db.refresh(oGames)
 
                 # we don't save the fact than this user own the game if he didn't allow bot to do it
-                query = db.query(Users).filter(Users.user_id).one()
-                if not query.disallow_globally:
+                query = db.query(Users).filter(Users.user_id == after.id)
+                if query.count() > 0:
+                    oUser = query.one()
+                else:
+                    oUser = User(user_id=after.id)
+                    db.add(oUser)
+                    db.commit()
+                    db.refresh(oUser)
+
+                if not oUser.disallow_globally:
                     query = db.query(UserGames).filter(UserGames.game_id == oGames.game_id, UserGames.user_id == after.id)
                     if query.count() == 0:
                         db.add(UserGames(game_id=oGames.game_id, user_id=after.id))
@@ -139,8 +149,6 @@ async def on_member_update(before, after):
                     logging.info("@{} added {}".format(after.id, activity.name.lower()))
     except Exception as err:
         logging.error(err)
-
-
 
 @bot.command()
 async def infos(ctx):
