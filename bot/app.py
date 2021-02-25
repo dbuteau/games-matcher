@@ -25,7 +25,7 @@ version = fo.readline()
 
 default_prefix = '$'
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(stream=sys.stdout, level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
 engine = create_engine('sqlite:///data/games-matcher-bot.db')
 Base.metadata.create_all(engine)
@@ -69,17 +69,39 @@ async def report_error(ctx, arg, line=0):
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MaxConcurrencyReached):
         await ctx.author.send('Bot is busy! Please retry in a minute')
-        return
+    elif isinstance(error, commands.PrivateMessageOnly):
+        msg = await ctx.channel.send('This command must be sent to bot by private message only')
+        await ctx.message.delete()
+        await asyncio.sleep(30)
+        msg.delete()
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.author.send("This command require argument(s), you forgot to give, see `$help <command>` to see what argument it needs")
+        await ctx.message.delete()
     else:
-        await ctx.author.send(f"Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient. {error}")
+        await ctx.author.send(f"Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient.")
         owner = (await bot.application_info()).owner
-        await owner.send(f'{error}')
+        await owner.send(f'{error.message}')
     if not isinstance(ctx.channel, discord.channel.DMChannel):
         await ctx.message.delete()
 
 @bot.command()
-async def debug(ctx):
-    await ctx.author.send(f'your discord id is: {ctx.author.id}')
+async def log(ctx):
+    try:
+        owner = (await bot.application_info()).owner
+        if ctx.author.id == owner.id:
+            logger = logging.getLogger()
+            level = logger.getEffectiveLevel()
+            if level == logging.DEBUG:
+                logger.setLevel(logging.ERROR)
+                await owner.send('logging set to INFO')
+            else:
+                logger.setLevel(logging.DEBUG)
+                await owner.send('logging set to DEBUG')
+        else:
+            await ctx.author.send('Nope')
+    except Exception as err:
+        logging.error(err)
+
 
 @bot.command()
 async def forceupdate(ctx):
@@ -117,35 +139,45 @@ async def on_ready():
 @bot.event
 async def on_guild_join(self, guild):
     """ on join add default config for guild """
-    query = db.query(Servers).filter(server_id=guild.id)
-    if query.count() == 0:
-        oServer = Servers(server_id=guild.id,prefix='$')
-        db.add(oServer)
-        db.commit()
-    query = db.query(Servers).filter(server_id=guild.id)
-    prefix = query.one().prefix
-    """ on join add default config for user in guild """
-    for member in guild.fetch_members:
-        query = db.query(Users).filter(user_id == member.id)
-        # If the user doesn't already exist in db, add it
+    try:
+        query = db.query(Servers).filter(server_id=guild.id)
         if query.count() == 0:
-            oUser = Users(user_id=member.id,disallow_globally=False,disallow_users=None)
-            db.add(oUser)
-    await guild.owner.send(f"Hello! i'm game matcher bot, i'm glad to work for your guild. You can use `{prefix}help` command to get more infos about me. See you soon! :)")
+            oServer = Servers(server_id=guild.id,prefix='$')
+            db.add(oServer)
+            db.commit()
+        query = db.query(Servers).filter(server_id=guild.id)
+        prefix = query.one().prefix
+        """ on join add default config for user in guild """
+        for member in guild.fetch_members:
+            query = db.query(Users).filter(user_id == member.id)
+            # If the user doesn't already exist in db, add it
+            if query.count() == 0:
+                oUser = Users(user_id=member.id,disallow_globally=False,disallow_users=None)
+                db.add(oUser)
+        #await guild.owner.send(f"Hello! i'm game matcher bot, i'm glad to work for your guild. You can use `{prefix}help` command to get more infos about me. See you soon! :)")
+        owner = (await bot.application_info()).owner
+        await owner.send(f"Hello! i'm game matcher bot, i'm glad to work for your guild. You can use `{prefix}help` command to get more infos about me. See you soon! :)")
+    except Exception as err:
+        logging.error(err)
 
 @bot.event
 async def on_member_update(before, after):
     """ listening when user is playing game """
     try:
-        logging.info(f'Detected activity of {after.id}')
         if not after.bot and after.activity:
             activity = after.activity
-            logging.info('detected @{} on {}'.format(after.id, activity.name))
+            logging.debug(f'detected {activity.name} activity for {after.display_name}@{after.id} on {after.guild}')
             if after.activity.type == discord.ActivityType.playing:
-                query = db.query(Games).filter(or_(Games.name == activity.name.lower(),Games.discord_id == activity.application_id))
+                if hasattr(activity, 'application_id'):
+                    query = db.query(Games).filter(or_(Games.name == activity.name.lower(),Games.discord_id == activity.application_id))
+                else:
+                    query = db.query(Games).filter(Games.name == activity.name.lower())
                 if query.count() == 0:
                     # add the game to database
-                    oGames = Games(name=activity.name.lower(), discord_id=activity.application_id)
+                    if hasattr(activity, 'application_id'):
+                        oGames = Games(name=activity.name.lower(), discord_id=activity.application_id)
+                    else:
+                        oGames = Games(name=activity.name.lower())
                     db.add(oGames)
                     db.commit()
                     db.refresh(oGames)
@@ -153,9 +185,10 @@ async def on_member_update(before, after):
                     raise RuntimeError('Duplicate game')
                 else:
                     oGames = query.one()
-                    oGames.discord_id=activity.application_id
-                    db.commit()
-                    db.refresh(oGames)
+                    if hasattr(activity, 'application_id'):
+                        oGames.discord_id=activity.application_id
+                        db.commit()
+                        db.refresh(oGames)
 
                 # we don't save the fact than this user own the game if he didn't allow bot to do it
                 query = db.query(Users).filter(Users.user_id == after.id)
@@ -172,7 +205,9 @@ async def on_member_update(before, after):
                     if query.count() == 0:
                         db.add(UserGames(game_id=oGames.game_id, user_id=after.id))
                         db.commit()
-                        logging.info("@{} added {}".format(after.id, activity.name.lower()))
+                        logging.debug("@{} added {}".format(after.id, activity.name.lower()))
+                    else:
+                        logging.debug(f"@{after.id} already tied to {activity.name.lower()}")
                         """else: bugged
                         oGamesOwned = query.one()
                         oGamesOwned.last_played_at = datetime.datetime.utcnow()
