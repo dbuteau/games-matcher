@@ -91,6 +91,7 @@ class Functions(commands.Cog):
     @commands.guild_only()
     async def find(self, ctx, game_name):
         """ find members which own the game <game name> """
+        nl = "\n"
         try:
             member_list = []
             search = game_name.lower()
@@ -103,7 +104,7 @@ class Functions(commands.Cog):
             if len(member_list) > 0:
                 msg = """
                 Gamer which own "{game_name.lower()}" {len(member_list)}
-                {'\n'.join(member_list)}
+                {'{nl}'.join(member_list)}
                 """
                 await ctx.author.send(msg)
             else:
