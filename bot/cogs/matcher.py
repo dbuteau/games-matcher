@@ -103,10 +103,12 @@ class Functions(commands.Cog):
                         member_list.append(member.display_name)
             if len(member_list) > 0:
                 msg = """
-                Gamer which own "{game_name.lower()}" {len(member_list)}
-                {'{nl}'.join(member_list)}
+                Gamer which own "{}" {}
+                {}
                 """
-                await ctx.channel.send(msg)
+                embed = discord.Embed(title=f'There is {len(member_list)} Which own "{game_name.lower()}"')
+                embed.add_field(name="Joueurs:", value='\n'.join(member_list))
+                await ctx.channel.send(embed=embed)
             else:
                 games = self.db.query(Games.name).filter(Games.name.ilike(f'%{game_name[0:4]}%')).limit(4).all()
                 alternate_games = []
