@@ -13,10 +13,15 @@ class Steam:
         try:
             result = self._session.get(f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?&steamid={steam_id}&include_appinfo=1&include_played_free_games=1")
             logging.debug(result.content)
-            return json.loads(result.content)
+            if hasattr(result, 'content'):
+                return json.loads(result.content)
+            else:
+                return false
         except TypeError as err:
+            logging.error(err)
             raise TypeError from err
         except Exception as err:
+            logging.error(err)
             raise Exception from err
 
     def get_game_info_from_store(self, game_id):

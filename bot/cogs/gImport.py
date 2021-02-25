@@ -23,16 +23,11 @@ class Import(commands.Cog):
         """ Import your steam library (send direct message to bot)"""
         try:
             logging.info(f'start Import of steam lib for {ctx.author.id}')
-            if not user_steam_id:
-                await ctx.author.send('steam_id is a required argument that is missing.')
-                return False
-            if not isinstance(ctx.channel, discord.channel.DMChannel):
-                await ctx.author.send('the steam command must be send by private message')
-                await ctx.message.delete()
-                return False
 
             api = Steam(os.environ['STEAM_API_KEY'])
             raw_data = api.get_User_Owned_Games(user_steam_id)
+            if not raw_data:
+                raise UserWarning("I can't read your steam library. Please put your games lib on steam as public")
             await ctx.author.send(f"We found {raw_data['response']['game_count']} games in your lib, it will take some time for extract infos from steam without get banned. Get you a coffee")
             counter = 0
             progress = await ctx.author.send(f"{counter}/{raw_data['response']['game_count']} processed")
@@ -48,7 +43,8 @@ class Import(commands.Cog):
                     await asyncio.sleep(1)
                     gameInfos = api.get_game_info_from_store(oGame.steam_id)
                     if gameInfos is None:
-                        await ctx.author.send(f"{oGame.name} no more exist in steam store")
+                        # await ctx.author.send(f"{oGame.name} no more exist in steam store")
+                        pass
                     else:
                         if 'categories' in gameInfos:
                             for category in gameInfos['categories']:
@@ -89,8 +85,7 @@ class Import(commands.Cog):
                 await progress.edit(content=f"{counter}/{raw_data['response']['game_count']} processed")
         except UserWarning as err:
             await ctx.author.send(f"{oGame.name} - {err}")
-            pass
         except Exception as err:
-            logging.info(f'{err}')
+            logging.error(f'{err}')
             raise Exception from err
 
