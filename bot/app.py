@@ -132,7 +132,7 @@ async def on_member_update(before, after):
                 if query.count() > 0:
                     oUser = query.one()
                 else:
-                    oUser = User(user_id=after.id)
+                    oUser = Users(user_id=after.id)
                     db.add(oUser)
                     db.commit()
                     db.refresh(oUser)
