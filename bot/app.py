@@ -63,6 +63,14 @@ async def report_error(ctx, arg, line=0):
     await owner.send(MESSAGES['HEY'].format(bot, datetime.datetime.now().strftime('%B %d %Y - %H:%M:%S')))
 
 @bot.event
+async def on_command_error(ctx,error):
+    await ctx.message.delete()
+    if isinstance(error, commands.MaxConcurrencyReached):
+        await ctx.author.send('Bot is busy! Please retry in a minute')
+        return
+
+
+@bot.event
 async def on_ready():
     """ create server config if not already exist """
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="{}help".format(default_prefix)))
