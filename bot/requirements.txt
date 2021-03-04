@@ -2,3 +2,4 @@ discord.py
 DiscordUtils
 SQLAlchemy
 requests
+alembic
