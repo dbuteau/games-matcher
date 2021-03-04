@@ -13,152 +13,123 @@ import DiscordUtils
 import asyncio
 from discord.ext import commands
 from discord.user import User
-from cogs import matcher, gImport, privacy
 from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
-from libs.models import Users, Games, UserGames, Servers, Base, WhosUp
-from  libs.interntools import interntools
-from libs.steam import Steam
+from libs.interntools import interntools
+from libs.models import (
+    engine,
+    Games,
+    Users,
+    UserGames
+)
+from cogs import (
+    owner,
+    pubcommands,
+    importlibs
+)
+from alembic.config import Config
+from alembic import command
 
+""" init all external needs """
 fo = open("version", "r")
 version = fo.readline()
 
-default_prefix = '$'
+default_level = os.environ.get('BOT_LOG') or logging.ERROR
 
-logging.basicConfig(stream=sys.stdout, level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-
-engine = create_engine('sqlite:///data/games-matcher-bot.db')
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-db = Session()
+logger = logging.getLogger('discord')
+logger.propagate = False
+logger.setLevel(int(default_level))
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter('%(asctime)s [%(name)s] - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 
 intents = discord.Intents.default()
-intents.presences = True
-intents.members = True
-intents.typing = False
-intents.guild_messages = True
-
-async def determine_prefix(bot, message):
-    query = db.query(Servers).filter(server_id=guild.id)
-    if query.count() > 0:
-        return query.one().prefix
-    else:
-        return default_prefix
-
-bot = commands.Bot(command_prefix=default_prefix, intents=intents)
-bot.add_cog(matcher.Functions(bot,db))
-bot.add_cog(gImport.Import(bot,db))
-bot.add_cog(privacy.Privacy(bot,db))
+intents.presences   = True
+intents.members     = True
+intents.typing      = False
+intents.messages    = True
+intents.reactions   = True
 
 
-# Init Error messages
-MESSAGES = {
-    'EXCEPTION': "Oups! I've encountered an unattended error and warned my maker about it",
-    'HEY': "{0.user} Unattended error, please check logs at {1}",
-    'NO_DATA': "Sorry i don't have data about {0.user}",
-    'NOT_IMPLEMENTED': 'Sorry but this command is not yet implemented'
-}
+global prefix
+def define_prefix(bot=None, message=None):
+    prefix = os.environ.get('BOT_PREFIX') or '$'
+    return prefix
+    #return commands.when_mentioned_or(*prefixes)(bot, message)
 
-async def report_error(ctx, arg, line=0):
-    logging.error(line, arg)
-    await ctx.author.send(MESSAGES['EXCEPTION'])
-    owner = (await bot.application_info()).owner
-    await owner.send(MESSAGES['HEY'].format(bot, datetime.datetime.now().strftime('%B %d %Y - %H:%M:%S')))
+bot = commands.Bot(command_prefix=define_prefix, intents=intents)
+
+async def default_presence():
+    try:
+        if define_prefix() != '!dev:':
+            await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{define_prefix()}help"))
+        else:
+            await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"$help"))
+    except Exception as err:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.MaxConcurrencyReached):
-        await ctx.author.send('Bot is busy! Please retry in a minute')
-    elif isinstance(error, commands.PrivateMessageOnly):
-        msg = await ctx.channel.send('This command must be sent to bot by private message only')
-        await ctx.message.delete()
-        await asyncio.sleep(30)
-        msg.delete()
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.author.send("This command require argument(s), you forgot to give, see `$help <command>` to see what argument it needs")
-        await ctx.message.delete()
-    else:
-        await ctx.author.send(f"Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient.")
-        owner = (await bot.application_info()).owner
-        await owner.send(f'{error.message}')
-    if not isinstance(ctx.channel, discord.channel.DMChannel):
-        await ctx.message.delete()
-
-@bot.command()
-async def log(ctx):
+    """ command error listener
+        change messages depending of error type
+    """
     try:
         owner = (await bot.application_info()).owner
-        if ctx.author.id == owner.id:
-            logger = logging.getLogger()
-            level = logger.getEffectiveLevel()
-            if level == logging.DEBUG:
-                logger.setLevel(logging.ERROR)
-                await owner.send('logging set to INFO')
-            else:
-                logger.setLevel(logging.DEBUG)
-                await owner.send('logging set to DEBUG')
+        logger.info(type(error))
+        if isinstance(error, commands.MaxConcurrencyReached):
+            await ctx.author.send('Bot is busy! Please retry in a minute', delete_after=30)
+        elif isinstance(error, commands.PrivateMessageOnly):
+            await ctx.channel.send('This command must be sent to bot by private message only', delete_after=30)
+            await ctx.message.delete()
+        elif isinstance(error, commands.NoPrivateMessage):
+            await ctx.author.send('This command must be sent on guild server channel only', delete_after=30)
+        elif isinstance(error, commands.NotOwner) or isinstance(error, commands.MissingPermissions):
+            await ctx.message.delete()
+            await ctx.author.send('You are not authorized to use this commands', delete_after=30)
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.author.send("This command require argument(s), you forgot to give, see `$help <command>` to see what argument it needs", delete_after=30)
+            await ctx.message.delete()
+        elif isinstance(error, UserWarning):
+            await ctx.author.send(error)
+        elif isinstance(error, commands.BotMissingPermissions):
+            msg = f'The bot is missing permission "{error.missing_perms}" to fullfill "{ctx.message.content}" on {ctx.guild.name}'
+            await ctx.guild.owner.send(msg)
+            logger.error(msg)
+        elif isinstance(error, commands.errors.CommandInvokeError):
+            await ctx.author.send(f'{error}')
         else:
-            await ctx.author.send('Nope')
+            await ctx.author.send(f"Sorry but i've encountered an error. My Owner was warned, he will investigate and fix me. Please be patient.")
+            await owner.send(f'{ctx.author.id}>"{ctx.message.content}" encountered error at {datetime.datetime.now()}')
+        if not isinstance(ctx.channel, discord.channel.DMChannel):
+            await ctx.message.delete()
+        logger.error(error)
+        await default_presence()
     except Exception as err:
-        logging.error(err)
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
 
 
-@bot.command()
-async def forceupdate(ctx):
-    try:
-        owner = (await bot.application_info()).owner
-        if ctx.author.id == owner.id:
-            query = db.query(Games)
-            logging.info(query.count())
-            if query.count()>0:
-                for oGame in query.all():
-                    if oGame.steam_id:
-                        api = Steam(os.environ['STEAM_API_KEY'])
-                        await asyncio.sleep(1)
-                        gameInfos = api.get_game_info_from_store(oGame.steam_id)
-                        if gameInfos is not None:
-                            if 'categories' in gameInfos:
-                                for category in gameInfos['categories']:
-                                    if category['id'] in (1,9):
-                                        logging.info('multiplayer detected')
-                                        oGame.multiplayer = True
-        else:
-            ctx.author.send('your are not owner of the bot... GFY!')
-    except Exception as err:
-        logging.error(err)
+@bot.event
+async def on_command_completion(ctx):
+    await default_presence()
 
 @bot.event
 async def on_ready():
     """ create server config if not already exist """
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="{}help".format(default_prefix)))
-    my_guilds = bot.guilds
-    for guild in my_guilds:
-        me_onguild = guild.me
-        logging.info(f"connected to {guild.name} as {me_onguild}")
-
-@bot.event
-async def on_guild_join(self, guild):
-    """ on join add default config for guild """
     try:
-        query = db.query(Servers).filter(server_id=guild.id)
-        if query.count() == 0:
-            oServer = Servers(server_id=guild.id,prefix='$')
-            db.add(oServer)
-            db.commit()
-        query = db.query(Servers).filter(server_id=guild.id)
-        prefix = query.one().prefix
-        """ on join add default config for user in guild """
-        for member in guild.fetch_members:
-            query = db.query(Users).filter(user_id == member.id)
-            # If the user doesn't already exist in db, add it
-            if query.count() == 0:
-                oUser = Users(user_id=member.id,disallow_globally=False,disallow_users=None)
-                db.add(oUser)
-        #await guild.owner.send(f"Hello! i'm game matcher bot, i'm glad to work for your guild. You can use `{prefix}help` command to get more infos about me. See you soon! :)")
-        owner = (await bot.application_info()).owner
-        await owner.send(f"Hello! i'm game matcher bot, i'm glad to work for your guild. You can use `{prefix}help` command to get more infos about me. See you soon! :)")
+        await default_presence()
+        my_guilds = bot.guilds
+        for guild in my_guilds:
+            me_onguild = guild.me
+            logger.info(f'{me_onguild} listening "{define_prefix()}" on {guild.name}')
+        logger.info(f"Log Level is set to { logging.getLogger('discord') }")
     except Exception as err:
-        logging.error(err)
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
 
 @bot.event
 async def on_member_update(before, after):
@@ -166,7 +137,7 @@ async def on_member_update(before, after):
     try:
         if not after.bot and after.activity:
             activity = after.activity
-            logging.debug(f'detected {activity.name} activity for {after.display_name}@{after.id} on {after.guild}')
+            logger.debug(f'detected {activity.name} activity for {after.display_name}@{after.id} on {after.guild}')
             if after.activity.type == discord.ActivityType.playing:
                 if hasattr(activity, 'application_id'):
                     query = db.query(Games).filter(or_(Games.name == activity.name.lower(),Games.discord_id == activity.application_id))
@@ -205,26 +176,41 @@ async def on_member_update(before, after):
                     if query.count() == 0:
                         db.add(UserGames(game_id=oGames.game_id, user_id=after.id))
                         db.commit()
-                        logging.debug("@{} added {}".format(after.id, activity.name.lower()))
+                        logger.debug("@{} added {}".format(after.id, activity.name.lower()))
                     else:
-                        logging.debug(f"@{after.id} already tied to {activity.name.lower()}")
+                        logger.debug(f"@{after.id} already tied to {activity.name.lower()}")
                         """else: bugged
                         oGamesOwned = query.one()
                         oGamesOwned.last_played_at = datetime.datetime.utcnow()
                         db.commit()"""
     except Exception as err:
-        logging.error(err)
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
 
-@bot.command()
-async def infos(ctx):
-    """ Get versions, github and support link """
-    await ctx.channel.send(
-        """
-Games-Matcher v{0},
-informations and support: https://github.com/dbuteau/games-matcher
-You can offer me a beer as thank via <https://paypal.me/DanielButeau>
-        """
-        .format(version)
-    )
+def run_migrations() -> None:
+    try:
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, 'head')
+    except Exception as err:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
 
-bot.run(os.environ['DISCORD_TOKEN'])
+if __name__ == '__main__':
+    try:
+        run_migrations()
+        logger.info("Migration ended")
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        """ loading Cogs """
+        bot.add_cog(owner.SuperAdmin(bot, db))
+        bot.add_cog(pubcommands.Commands(bot, db))
+        bot.add_cog(importlibs.Import(bot, db))
+
+        bot.run(os.environ['DISCORD_TOKEN'], bot=True, reconnect=True)
+    except Exception as err:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
