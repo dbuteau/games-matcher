@@ -8,7 +8,7 @@ from libs.models import (
 )
 
 
-class Privacy(commands.Cog, name='Private messages commands'):
+class Privacy(commands.Cog, name='Direct messages commands'):
     """ Control how bot interact with your privacy """
     def __init__(self, bot, db):
         self.bot = bot

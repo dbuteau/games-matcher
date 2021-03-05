@@ -25,6 +25,14 @@ class Commands(commands.Cog, name='Channel commands'):
         self.bot = bot
         self.db = db
 
+    @commands.group(pass_context=True, hidden=True)
+    async def test(self, ctx):
+        """
+        dummy group for allowing wrote to dev server bot
+        without erroring the prod one
+        """
+        pass
+
     @commands.command()
     @commands.guild_only()
     async def top(self, ctx, Number=10):
@@ -250,6 +258,12 @@ class Commands(commands.Cog, name='Channel commands'):
             lfgmsg.delete()
         except discord.Forbidden:
             ctx.channel.send("Sorry i don't have permissions to create voice channel")
+
+
+class Both(commands.Cog, name='Misc.'):
+    def __init__(self, bot, db):
+        self.bot = bot
+        self.db = db
 
     @commands.command()
     async def about(self, ctx):

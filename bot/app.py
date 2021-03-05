@@ -63,19 +63,16 @@ def define_prefix(bot=None, message=None):
     return prefix
 
 
-help_command = commands.DefaultHelpCommand(
-    no_category='Both'
-)
-
 bot = commands.Bot(
     command_prefix=define_prefix,
+    case_insensitive=True,
     intents=intents,
-    help_command=help_command)
+)
 
 
 async def default_presence():
     try:
-        if define_prefix() != '!dev:':
+        if define_prefix() != '$test':
             await bot.change_presence(
                 activity=Activity(
                     type=ActivityType.watching,
@@ -263,10 +260,13 @@ if __name__ == '__main__':
         logger.info("Migration ended")
 
         """ loading Cogs """
-        bot.add_cog(owner.SuperAdmin(bot, db))
         bot.add_cog(pubcommands.Commands(bot, db))
+        bot.add_cog(pubcommands.Both(bot, db))
         bot.add_cog(importlibs.Import(bot, db))
-        bot.add_cog(privacy.Privacy(bot,db))
+        bot.add_cog(privacy.Privacy(bot, db))
+        bot.add_cog(owner.SuperAdmin(bot, db))
+
+        bot.help_command.cog = bot.cogs["Misc."]
 
         bot.run(os.environ['DISCORD_TOKEN'], bot=True, reconnect=True)
     except Exception as err:
