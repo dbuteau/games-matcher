@@ -11,6 +11,19 @@ RUN python3 -m pip install -r requirements.txt
 
 FROM python:alpine
 
+ARG VCS_REF
+ARG BUILD_DATE
+ARG BUILD_VERSION
+
+LABEL   org.label-schema.name="games-matcher"\
+        org.label-schema.description="discord bot for helping user to find games in commons"\
+        org.label-schema.url="https://github.com/dbuteau/games-matcher"\
+        org.label-schema.vcs-url="https://github.com/dbuteau/games-matcher.git"\
+        org.label-schema.docker.params="DISCORD_TOKEN,STEAM_API_KEY"\
+        org.label-schema.build-date="$BUILD_DATE"\
+        org.label-schema.vcs-ref="$VCS_REF"\
+        org.label-schema.version="$BUILD_VERSION"
+
 COPY bot /
 RUN [ -d /data ]||mkdir /data
 RUN python3 -m pip install --upgrade pip
