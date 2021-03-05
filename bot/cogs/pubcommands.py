@@ -280,7 +280,7 @@ class Both(commands.Cog, name='Misc.'):
             "\nYou can thank me by "\
             "[paying me a beer](https://paypal.me/DanielButeau)"
         desc += \
-            "\nYou can join [this channel](https://discord.gg/5BP4HbjVD6) if you want to help testing"\
+            "\nYou can join [this channel](https://discord.gg/4bhFFnCatf) if you want to help testing"\
             " the beta version of this bot"
         embed.description = desc
         embed.add_field(name='version', value=f'{version}')
