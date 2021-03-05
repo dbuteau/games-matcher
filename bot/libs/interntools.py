@@ -1,11 +1,16 @@
-import os, sys
+import os
+import sys
 import discord
 import DiscordUtils
 import logging
 
+
 class interntools:
 
-    async def paginate(ctx, listing, header=None, footer=None, remove_reaction=True, vote=False, limit=10):
+    async def paginate(
+            ctx, listing, header=None,
+            footer=None, remove_reaction=True, vote=False, limit=10):
+
         try:
             logger = logging.getLogger('discord')
             nb_elm_by_page = limit
@@ -17,21 +22,26 @@ class interntools:
                 if len(pages) <= current_page:
                     pages.insert(current_page, list())
                 pages[current_page].append(str(listing[i]))
-            logger.info(pages)
+            logger.debug(f"pages: {pages}")
 
             i = 0
             for page in pages:
                 i += 1
                 nl = '\n'
-                content = f"{nl}- ".join(['',*page])
+                content = f"{nl}- ".join(['', *page])
                 if header is None:
                     header = f"Page {i}"
                 if footer is not None:
                     content += f"{nl}{footer}"
-                embeds.append(discord.Embed(color=ctx.author.color).add_field(name=header, value=content))
-            paginator = DiscordUtils.Pagination.CustomEmbedPaginator(ctx, remove_reactions=remove_reaction, auto_footer=True, timeout=timeout)
-            paginator.add_reaction('⏪', 'back')
-            paginator.add_reaction('⏩', 'next')
+                embeds.append(
+                    discord.Embed(color=ctx.author.color)
+                    .add_field(name=header, value=content))
+            paginator = DiscordUtils.Pagination.CustomEmbedPaginator(
+                        ctx, remove_reactions=remove_reaction,
+                        auto_footer=True, timeout=timeout)
+            if len(pages) > 1:
+                paginator.add_reaction('⏪', 'back')
+                paginator.add_reaction('⏩', 'next')
             await paginator.run(embeds)
         except Exception as err:
             exc_type, exc_obj, exc_tb = sys.exc_info()
