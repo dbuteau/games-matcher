@@ -14,7 +14,8 @@ from libs.api.steam import Steam
 from libs.models import Games, UserGames
 from libs.interntools import interntools
 
-class Import(commands.Cog, name='Library Management'):
+
+class Import(commands.Cog, name='Private messages commands'):
     self = None
 
     def __init__(self, bot, db):
@@ -25,7 +26,7 @@ class Import(commands.Cog, name='Library Management'):
 
     @commands.group(name='import')
     async def library(self, ctx):
-        """ (Private message only)Import your owned games. See `help import` """
+        """ (DM only)Import your owned games. See `help import` """
         if ctx.invoked_subcommand is None:
             await ctx.send('Sub command missing type `{self.bot.get_prefix}help` import')
 
