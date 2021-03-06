@@ -38,12 +38,15 @@ Session = sessionmaker(bind=engine)
 db = Session()
 default_level = os.environ.get('BOT_LOG') or logging.ERROR
 
+fo = open("version", "r")
+version = fo.readline()
+
 logger = logging.getLogger('discord')
 logger.propagate = False
 logger.setLevel(int(default_level))
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(
-    logging.Formatter('%(asctime)s [%(name)s] - %(levelname)s - %(message)s')
+    logging.Formatter(f'%(asctime)s [v{version}][%(name)s] - %(levelname)s - %(message)s')
 )
 logger.addHandler(handler)
 
@@ -138,7 +141,7 @@ async def on_command_error(ctx, error):
                 f'{ctx.author.id}>"{ctx.message.content}" encountered error\
                 at {datetime.datetime.now()}')
         if not isinstance(ctx.channel, channel.DMChannel):
-            if ctx.message():
+            if ctx.message:
                 await ctx.message.delete()
         logger.error(error)
         await default_presence()
