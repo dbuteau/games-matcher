@@ -24,6 +24,7 @@ class Commands(commands.Cog, name='Channel commands'):
     def __init__(self, bot, db):
         self.bot = bot
         self.db = db
+        self.logger = logging.getLogger('discord')
 
     @commands.group(pass_context=True, hidden=True)
     async def test(self, ctx):
@@ -114,32 +115,44 @@ class Commands(commands.Cog, name='Channel commands'):
     async def find(self, ctx, *, game_name: str):
         """ game_name : find members which own the 'game name' """
         try:
+            self.logger.debug('command find called')
             member_list = []
             embed = discord.Embed(title=f'Search Members owning "{game_name}"')
             search = game_name.lower()
-            users = self.db.query(UserGames.user_id).join(Games)\
-                .filter(Games.name == search).all()
-            for user in users:
-                if not user.user_id == ctx.author.id:
-                    member = discord.utils.find(
-                        lambda m: m.id == user.user_id,
-                        ctx.guild.members)
-                    if member:
-                        member_list.append(member.display_name)
-            if len(member_list) > 0:
-                embed.add_field(name='Result', value='\n'.join(member_list))
+            query = self.db.query(Games.name)\
+                    .filter(Games.name.like(f'%{search}%'))
+            self.logger.debug(f'found {query.count()} games for "{search}"')
+            if query.count() > 1:
+                embed.description = "Please be more specific your term returned multiple results"
+                if query.count() <=10:
+                    embed.add_field(name='Choices',value='\n'.join([r for r, in query.all()]))
+                    await ctx.channel.send(embed=embed)
+                else:
+                    await interntools.paginate(ctx, [r for r, in query.all()], header=embed.description)
             else:
-                embed.add_field(
-                    name="Result",
-                    value='Sorry found no one here owning this game')
-            await ctx.channel.send(embed=embed)
-        except commands.NoPrivateMessag:
+                user = self.db.query(UserGames.user_id).join(Games)\
+                    .filter(Games.name == search).all()
+                for user in users:
+                    if not user.user_id == ctx.author.id:
+                        member = discord.utils.find(
+                            lambda m: m.id == user.user_id,
+                            ctx.guild.members)
+                        if member:
+                            member_list.append(member.display_name)
+                if len(member_list) > 0:
+                    embed.add_field(name='Result', value='\n'.join(member_list))
+                else:
+                    embed.add_field(
+                        name="Result",
+                        value='Sorry found no one here owning this game')
+                await ctx.channel.send(embed=embed)
+        except commands.NoPrivateMessage:
             await ctx.author.send(
                 "This command need to be send in guild channel only,\
                  not in private message")
             pass
         except Exception as err:
-            logging.info(f'Match command raised and exception; {err}')
+            self.logger.info(f'Match command raised and exception; {err}')
 
     @commands.command()
     @commands.guild_only()
