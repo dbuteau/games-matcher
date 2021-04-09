@@ -268,9 +268,9 @@ class Commands(commands.Cog, name='Channel commands'):
                         lfgmsg.delete()
             reaction, user = await self.bot.wait_for('reaction_add', timeout=(30*60), check=check)
         except asyncio.TimeoutError:
-            lfgmsg.delete()
+            await lfgmsg.delete()
         except discord.Forbidden:
-            ctx.channel.send("Sorry i don't have permissions to create voice channel")
+            await ctx.channel.send("Sorry i don't have permissions to create voice channel")
 
 
 class Both(commands.Cog, name='Misc.'):

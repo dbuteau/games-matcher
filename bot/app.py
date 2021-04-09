@@ -202,7 +202,7 @@ async def on_member_update(before, after):
                     db.commit()
                     db.refresh(oGames)
                 elif query.count() > 1:
-                    raise RuntimeError('Duplicate game')
+                    raise RuntimeError('Duplicate game: {activity.name.lower}')
                 else:
                     oGames = query.one()
                     if hasattr(activity, 'application_id'):
