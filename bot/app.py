@@ -39,7 +39,7 @@ db = Session()
 default_level = os.environ.get('BOT_LOG') or logging.ERROR
 
 fo = open("version", "r")
-version = fo.readline()
+version = fo.readline().strip()
 
 logger = logging.getLogger('discord')
 logger.propagate = False

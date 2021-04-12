@@ -108,7 +108,7 @@ class Commands(commands.Cog, name='Channel commands'):
             else:
                 await ctx.channel.send('No games in common found')
         except Exception as err:
-            logging.info(f'Match command raised and exception; {err}')
+            logging.error(f'Match command raised and exception; {err}')
 
     @commands.command()
     @commands.guild_only()
@@ -130,7 +130,7 @@ class Commands(commands.Cog, name='Channel commands'):
                 else:
                     await interntools.paginate(ctx, [r for r, in query.all()], header=embed.description)
             else:
-                user = self.db.query(UserGames.user_id).join(Games)\
+                users = self.db.query(UserGames.user_id).join(Games)\
                     .filter(Games.name == search).all()
                 for user in users:
                     if not user.user_id == ctx.author.id:
@@ -152,7 +152,7 @@ class Commands(commands.Cog, name='Channel commands'):
                  not in private message")
             pass
         except Exception as err:
-            self.logger.info(f'Match command raised and exception; {err}')
+            self.logger.error(f'find command raised and exception; {err}')
 
     @commands.command()
     @commands.guild_only()
