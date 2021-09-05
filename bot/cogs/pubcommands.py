@@ -7,6 +7,7 @@ from datetime import (
 )
 import re
 import discord
+from discord.channel import VoiceChannel
 from discord.ext import commands
 from libs.interntools import interntools
 from libs.models import (
@@ -238,7 +239,8 @@ class Commands(commands.Cog, name='Channel commands'):
                 color=0xff0000
                 )
             embedModel.add_field(name='Game', value=f'{game}', inline=True)
-            embedModel.set_footer(text='react with 👍 if you are interested to join')
+            footer = 'react with 👍 if you are interested to join.\nWhen the number of players wanted is reached a voice channel will be created and persons whom reacted automaticly join the channel'
+            embedModel.set_footer(text=footer)
 
             userlist = []
             userlist.append(ctx.author)
@@ -252,7 +254,7 @@ class Commands(commands.Cog, name='Channel commands'):
             async def update_embed(embed):
                 await lfgmsg.edit(embed=embed)
 
-            def check(reaction, user):
+            async def check(reaction, user):
                 if str(reaction.emoji) == '👍':  # and user.id != ctx.author.id:
                     if len(userlist) <= nb_players:
                         userlist.append(user)
@@ -262,7 +264,18 @@ class Commands(commands.Cog, name='Channel commands'):
                             value=f'{len(userlist)}/{nb_players or 2}', inline=True)
                         update_embed(embed)
                     if len(userlist) == nb_players:
-                        channel = ctx.guild.create_voice_channel(f'{game}', user_limit=nb_players)
+                        # check if channel is already existing with same name
+                        channels = ctx.guild.fetch_channels()
+                        nbChan = 1
+                        chanName = f'{game}'
+                        for chan in channels:
+                            if isinstance(chan, VoiceChannel):
+                                if chan.name == game:
+                                    chanName = f'{game}_{nbChan}'
+                                if chan.name == f'{game}_{nbChan}':
+                                    nbChan += 1
+                        # create the voice channel
+                        channel = ctx.guild.create_voice_channel(f'{chanName}', user_limit=nb_players)
                         for user in userlist:
                             user.move_to(channel)
                         lfgmsg.delete()
@@ -270,7 +283,9 @@ class Commands(commands.Cog, name='Channel commands'):
         except asyncio.TimeoutError:
             await lfgmsg.delete()
         except discord.Forbidden:
-            await ctx.channel.send("Sorry i don't have permissions to create voice channel")
+            await ctx.channel.send("Sorry i don't have permissions to create voice channel, you have to create yourself or use existing one")
+        except Exception as err:
+            self.logger.error(f'lfg command raised and exception; {err}')
 
 
 class Both(commands.Cog, name='Misc.'):
