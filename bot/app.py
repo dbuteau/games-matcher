@@ -143,7 +143,7 @@ async def on_command_error(ctx, error):
         if not isinstance(ctx.channel, channel.DMChannel):
             if ctx.message:
                 await ctx.message.delete()
-        logger.error(error)
+        logger.error(f'{ctx.message.content}-{error}')
         await default_presence()
 
     except Exception as err:

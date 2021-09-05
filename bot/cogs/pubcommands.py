@@ -109,7 +109,7 @@ class Commands(commands.Cog, name='Channel commands'):
             else:
                 await ctx.channel.send('No games in common found')
         except Exception as err:
-            logging.error(f'Match command raised and exception; {err}')
+            logging.error(f'Match command raised an exception; {err}')
 
     @commands.command()
     @commands.guild_only()
@@ -153,7 +153,7 @@ class Commands(commands.Cog, name='Channel commands'):
                  not in private message")
             pass
         except Exception as err:
-            self.logger.error(f'find command raised and exception; {err}')
+            self.logger.error(f'find command raised an exception; {err}')
 
     @commands.command()
     @commands.guild_only()
@@ -285,7 +285,7 @@ class Commands(commands.Cog, name='Channel commands'):
         except discord.Forbidden:
             await ctx.channel.send("Sorry i don't have permissions to create voice channel, you have to create yourself or use existing one")
         except Exception as err:
-            self.logger.error(f'lfg command raised and exception; {err}')
+            self.logger.error(f'lfg command raised an exception; {err}')
 
 
 class Both(commands.Cog, name='Misc.'):
