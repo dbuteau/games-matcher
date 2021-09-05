@@ -46,12 +46,12 @@ class Steam:
             req = self._session.get(f'https://store.steampowered.com/api/appdetails?appids={game_id}')
             result = json.loads(req.content)
             if result[f'{game_id}']:
-                if result[str(game_id)]['success'] == True:
+                if result[str(game_id)]['success'] is True:
                     return result[f"{game_id}"]['data']
                 else:
-                    raise ValueError(f"steam store don't know  for steam_id {game_id}")
+                    raise ValueError(f"steam store don't know for the game_id {game_id}")
             else:
-                raise ValueError(f"steam store has responded badly for steam_id #{game_id}")
+                raise ValueError(f"steam store has responded badly for game_id #{game_id}")
         except requests.exceptions.RequestException as err:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
