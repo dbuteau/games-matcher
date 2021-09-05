@@ -159,15 +159,15 @@ class Import(commands.Cog, name='Direct messages commands'):
                 query = self._db.query(Games)\
                     .filter(
                         Games.multiplayer.is_(True),
-                        Games.release_date == None,
-                        Games.steam_id != None)
+                        Games.release_date is None,
+                        Games.steam_id is not None)
             elif criteria == 'multi':
                 query = self._db.query(Games)\
                     .filter(
                         Games.multiplayer.is_(True),
-                        Games.steam_id != None,
+                        Games.steam_id is not None,
                         or_(
-                            Games.release_date == None,
+                            Games.release_date is None,
                             Games.release_date.is_(False)))
             else:
                 raise UserWarning("choose between 'date' or 'multi'")

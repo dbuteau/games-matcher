@@ -3,3 +3,4 @@ DiscordUtils
 SQLAlchemy
 requests
 alembic
+python-dateutil

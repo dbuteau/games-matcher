@@ -145,6 +145,7 @@ async def on_command_error(ctx, error):
                 await ctx.message.delete()
         logger.error(error)
         await default_presence()
+
     except Exception as err:
         exc_tb = sys.exc_info()[2]
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
