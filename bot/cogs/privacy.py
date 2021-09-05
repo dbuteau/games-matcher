@@ -18,7 +18,6 @@ class Privacy(commands.Cog, name='Direct messages commands'):
     async def privacy(self, ctx):
         """ (DM only)Control how bot interact with your privacy
             `help privacy` for more infos
-            type `$privacy <command>` to use command below
         """
         nl = "\n"
         if isinstance(ctx.channel, discord.channel.DMChannel):

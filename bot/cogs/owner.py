@@ -63,10 +63,16 @@ class SuperAdmin(commands.Cog):
     @commands.dm_only()
     async def gamesof(self, ctx, member: discord.Member):
         try:
-            logging.error('debug')
+            Number = 50
             query = self.db.query(Games.name).filter(Games.game_id == UserGames.game_id, UserGames.user_id == member.id)
             embed = discord.Embed(title=f'{member.display_name}@{member.id} games:')
             embed.add_field(name="Games", value=query.all())
+            result = []
+            for game in query.all():
+                result.append(f'{game.name} ({game.Nb})')
+            if query.count() > 0:
+                header = f'{member.display_name} have {query.count()} games:'
+                await interntools.paginate(ctx, result, header=header)
             await ctx.author.send(embed=embed)
         except Exception as err:
             raise Exception(f'gamesof for {member.display_name}@{member.id} - {err}') from err
