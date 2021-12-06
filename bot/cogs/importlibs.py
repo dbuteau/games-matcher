@@ -32,18 +32,18 @@ class Import(commands.Cog, name='Direct messages commands'):
 
     async def get_gameinfos(self, steam_id):
         try:
-            result = {}
-            result['multiplayer'] = False
+            result = False
             api = Steam(os.environ['STEAM_API_KEY'])
             gameInfos = api.get_game_info_from_store(steam_id)
             if gameInfos is not None:
+                result = {}
+                result['multiplayer'] = False
                 if gameInfos['categories']:
                     for category in gameInfos['categories']:
                         if category['id'] in (1, 9):
                             self.logger.debug(f"{gameInfos['name']} is multiplayer")
                             result['multiplayer'] = True
                 if gameInfos['release_date']['date'] != '':
-
                     result['release_date'] = dateutil.parser.parse(gameInfos['release_date']['date'])
                     self.logger.info(f"{gameInfos['release_date']['date']} converted to {result['release_date']}")
                 else:
@@ -89,9 +89,12 @@ class Import(commands.Cog, name='Direct messages commands'):
                 gameInfos = None
                 if query.count() == 0 or (query.count() == 1 and query.one().multiplayer is None):
                     await asyncio.sleep(1)
-                    details = await self.get_gameinfos(user_steam_id)
-                    oGame.release_date = details['release_date']
-                    oGame.multiplayer = details['multiplayer']
+                    details = await self.get_gameinfos(oGame.steam_id)
+                    if details:
+                        oGame.release_date = details['release_date']
+                        oGame.multiplayer = details['multiplayer']
+                    else:
+                        self.logger.info(f"{game['name'].lower()} not found in steam store")
                 elif query.count() == 1 and query.one().multiplayer:
                     counter['multi'] += 1
 

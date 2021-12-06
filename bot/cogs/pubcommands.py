@@ -121,16 +121,16 @@ class Commands(commands.Cog, name='Channel commands'):
             embed = discord.Embed(title=f'Search Members owning "{game_name}"')
             search = game_name.lower()
             query = self.db.query(Games.name)\
-                    .filter(Games.name.like(f'%{search}%'))
+                    .filter(Games.name.like(f'{search}'))
             self.logger.debug(f'found {query.count()} games for "{search}"')
             if query.count() > 1:
-                embed.description = "Please be more specific your term returned multiple results"
-                if query.count() <=10:
+                embed.description = "Please be more specific your term returned multiple results."
+                if query.count() <= 10:
                     embed.add_field(name='Choices',value='\n'.join([r for r, in query.all()]))
                     await ctx.channel.send(embed=embed)
                 else:
                     await interntools.paginate(ctx, [r for r, in query.all()], header=embed.description)
-            else:
+            elif query.count() == 1:
                 users = self.db.query(UserGames.user_id).join(Games)\
                     .filter(Games.name == search).all()
                 for user in users:
@@ -147,6 +147,12 @@ class Commands(commands.Cog, name='Channel commands'):
                         name="Result",
                         value='Sorry found no one here owning this game')
                 await ctx.channel.send(embed=embed)
+            else:
+                embed.add_field(
+                    name="Result",
+                    value='Sorry found no game with this name, try with "%" char as wildcard if you are not sure of the name')
+                await ctx.channel.send(embed=embed)
+                
         except commands.NoPrivateMessage:
             await ctx.author.send(
                 "This command need to be send in guild channel only,\
@@ -231,9 +237,10 @@ class Commands(commands.Cog, name='Channel commands'):
             create voice channel with member in it
         """
         try:
-            match = re.match(r"([\D|\s]+)(\d*)", param, re.I)
+            match = re.match(r"([\w|\s]+) (\d*)", param, re.I)
             if match:
                 game, nb_players = match.groups()
+                nb_players = int(nb_players)
             embedModel = discord.Embed(
                 title=f'{ctx.author.display_name} is searching for a group!',
                 color=0xff0000
@@ -254,15 +261,16 @@ class Commands(commands.Cog, name='Channel commands'):
             async def update_embed(embed):
                 await lfgmsg.edit(embed=embed)
 
-            async def check(reaction, user):
+            def check(reaction, user):
+                self.logger.info(reaction)
                 if str(reaction.emoji) == '👍':  # and user.id != ctx.author.id:
                     if len(userlist) <= nb_players:
                         userlist.append(user)
                         embed = embedModel
                         embed.add_field(
                             name='Nb Players wanted',
-                            value=f'{len(userlist)}/{nb_players or 2}', inline=True)
-                        update_embed(embed)
+                            value=f'{reaction.count + 1}/{nb_players or 2}', inline=True)
+                        asyncio.create_task(update_embed(embed))
                     if len(userlist) == nb_players:
                         # check if channel is already existing with same name
                         channels = ctx.guild.fetch_channels()
@@ -280,6 +288,7 @@ class Commands(commands.Cog, name='Channel commands'):
                             user.move_to(channel)
                         lfgmsg.delete()
             reaction, user = await self.bot.wait_for('reaction_add', timeout=(30*60), check=check)
+            reaction, user = await self.bot.wait_for('raw_reaction_remove', timeout=(30*60), check=check)
         except asyncio.TimeoutError:
             await lfgmsg.delete()
         except discord.Forbidden:

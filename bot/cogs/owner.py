@@ -76,3 +76,31 @@ class SuperAdmin(commands.Cog):
                 ctx.author.send('None returned')
         except Exception as err:
             raise Exception(f'gamesof for {member.display_name}@{member.id} - {err}') from err
+
+    @commands.command(pass_context=True)
+    @commands.is_owner()
+    @commands.dm_only()
+    async def whois(self, ctx, member: discord.Member):
+        try:
+            await ctx.author.send(f'{member.display_name}@{member.id}')
+        except Exception as err:
+            self.logger.error(err)
+            raise Exception('whois command failed') from err
+
+    @commands.command(pass_context=True)
+    @commands.is_owner()
+    @commands.dm_only()
+    async def msg(self, ctx, member: discord.Member):
+        raise NotImplementedError
+
+    @commands.command(pass_context=True)
+    @commands.is_owner()
+    @commands.dm_only()
+    async def banserv(self,ctx):
+        raise NotImplementedError
+
+    @commands.command(pass_context=True)
+    @commands.is_owner()
+    @commands.dm_only()
+    async def banperson(self,ctx):
+        raise NotImplementedError

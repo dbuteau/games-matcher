@@ -75,7 +75,7 @@ bot = commands.Bot(
 
 async def default_presence():
     try:
-        if define_prefix() != '$test':
+        if define_prefix() != '$test:':
             await bot.change_presence(
                 activity=Activity(
                     type=ActivityType.watching,
@@ -98,7 +98,7 @@ async def on_command_error(ctx, error):
     """
     try:
         owner = (await bot.application_info()).owner
-        logger.info(type(error))
+        logger.info(f'{ctx.message.content} - type(error)')
         if isinstance(error, commands.MaxConcurrencyReached):
             await ctx.author.send(
                 'Bot is busy! Please retry in a minute',
@@ -138,12 +138,11 @@ async def on_command_error(ctx, error):
                 My Owner was warned, he will investigate and fix me. \
                 Please be patient.")
             await owner.send(
-                f'{ctx.author.id}>"{ctx.message.content}" encountered error\
-                at {datetime.datetime.now()}')
+                f'{{datetime.datetime.now()}\tERROR\tctx.author.display_name}@{ctx.guild.name} > "{ctx.message.content}" {error}')
         if not isinstance(ctx.channel, channel.DMChannel):
             if ctx.message:
                 await ctx.message.delete()
-        logger.error(f'{ctx.message.content}-{error}')
+        
         await default_presence()
 
     except Exception as err:
