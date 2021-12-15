@@ -138,11 +138,12 @@ async def on_command_error(ctx, error):
                 My Owner was warned, he will investigate and fix me. \
                 Please be patient.")
             await owner.send(
-                f'{{datetime.datetime.now()}\tERROR\tctx.author.display_name}@{ctx.guild.name} > "{ctx.message.content}" {error}')
+                f"{datetime.datetime.now()} ERROR {ctx.author.display_name}@{ctx.guild.name} > {ctx.message.content} {error}"
+	    )
         if not isinstance(ctx.channel, channel.DMChannel):
             if ctx.message:
                 await ctx.message.delete()
-        
+
         await default_presence()
 
     except Exception as err:
