@@ -80,6 +80,24 @@ class SuperAdmin(commands.Cog):
     @commands.command(pass_context=True)
     @commands.is_owner()
     @commands.dm_only()
+    async def games_search(self, ctx, game_name):
+        try:
+            query = self.db.query(Games.game_id).filter(Games.game_name == game_name)
+            embed = discord.Embed(title=f'result for:{game_name}')
+            embed.add_field(name="found", value=query.all())
+            result = []
+            for game in query.all():
+                result.append(f'{game.id}  {game.name}')
+            if query.count() > 0:
+                await interntools.paginate(ctx, result)
+            else:
+                ctx.author.send('None returned')
+        except Exception as err:
+            raise Exception(f'game search "{game_name}" - {err}') from err
+
+    @commands.command(pass_context=True)
+    @commands.is_owner()
+    @commands.dm_only()
     async def whois(self, ctx, member: discord.Member):
         try:
             await ctx.author.send(f'{member.display_name}@{member.id}')
