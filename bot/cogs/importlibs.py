@@ -83,7 +83,10 @@ class Import(commands.Cog, name='Direct messages commands'):
 
                 # check if the game is already in db search by id or by name,
                 # should return only one row in anycase else there is problem
-                query = self._db.query(Games).filter(or_(Games.steam_id == oGame.steam_id, Games.name == oGame.name))
+                query = self._db.query(Games).filter(Games.steam_id == oGame.steam_id)
+                if query.count() == 0:
+                    query = self._db.query(Games).filter(Games.name == oGame.name)
+                
 
                 # if we miss some game info, then we ask steam store for it,
                 # warning the api is very sensible to 'too much request'
