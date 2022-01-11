@@ -137,7 +137,7 @@ async def on_command_error(ctx, error):
             await ctx.author.send("Sorry but i've encountered an error.\
                 My Owner was warned, he will investigate and fix me. \
                 Please be patient.")
-            if ctx.guild.name:
+            if ctx.guild is not None:
                 await owner.send(
                     f"{datetime.datetime.now()} ERROR {ctx.author.display_name}@{ctx.guild.name} > {ctx.message.content} {error}"
                 )
