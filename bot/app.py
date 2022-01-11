@@ -137,9 +137,14 @@ async def on_command_error(ctx, error):
             await ctx.author.send("Sorry but i've encountered an error.\
                 My Owner was warned, he will investigate and fix me. \
                 Please be patient.")
-            await owner.send(
-                f"{datetime.datetime.now()} ERROR {ctx.author.display_name}@{ctx.guild.name} > {ctx.message.content} {error}"
-	    )
+            if ctx.guild.name:
+                await owner.send(
+                    f"{datetime.datetime.now()} ERROR {ctx.author.display_name}@{ctx.guild.name} > {ctx.message.content} {error}"
+                )
+            else:
+                await owner.send(
+                    f"{datetime.datetime.now()} ERROR {ctx.author.display_name}@private > {ctx.message.content} {error}"
+	            )
         if not isinstance(ctx.channel, channel.DMChannel):
             if ctx.message:
                 await ctx.message.delete()
@@ -161,6 +166,7 @@ async def on_command_completion(ctx):
 async def on_ready():
     """ create server config if not already exist """
     try:
+        owner = (await bot.application_info()).owner
         await default_presence()
         my_guilds = bot.guilds
         for guild in my_guilds:
@@ -168,10 +174,12 @@ async def on_ready():
             logger.info(
                 f'{me_onguild} listening "{define_prefix()}" on {guild.name}')
         logger.info(f"Log Level is set to { logging.getLogger('discord') }")
+        await owner.send('Well Hello there!')
     except Exception as err:
         exc_tb = sys.exc_info()[2]
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
+        await owner.send(f"Can't start - {err}")
 
 
 @bot.event

@@ -61,6 +61,7 @@ class Import(commands.Cog, name='Direct messages commands'):
     async def steam(self, ctx, user_steam_id):
         """ Import the `steam_id` Steam library. """
         try:
+            owner = (await ctx.bot.application_info()).owner
             self.logger.info(f'start Import of steam lib for {ctx.author.id}')
             await ctx.bot.change_presence(
                 activity=discord.Activity(
@@ -95,6 +96,7 @@ class Import(commands.Cog, name='Direct messages commands'):
                         oGame.multiplayer = details['multiplayer']
                     else:
                         self.logger.info(f"{game['name'].lower()} not found in steam store")
+                        await ctx.author.send(f"{oGame.name} - not found in steam store API")
                 elif query.count() == 1 and query.one().multiplayer:
                     counter['multi'] += 1
 
@@ -112,14 +114,16 @@ class Import(commands.Cog, name='Direct messages commands'):
                     self.logger.info(f"update game #{gameindb.game_id}/{oGame.steam_id}: {oGame.name}")
                 elif query.count() > 1:
                     # if more than one row is found, need human investigation
-                    self.logger.error(f"game_id={oGame.steam_id} name={oGame.name} got possible duplicate")
+                    err = f"game_id={oGame.steam_id} name={oGame.name} got possible duplicate"
+                    self.logger.error(err)
+                    await owner.send(err)
 
                 # refresh request
                 oGame = query.one()
                 self._db.refresh(oGame)
 
                 if oGame.multiplayer is None:
-                    raise UserWarning('Game was not updated')
+                    await ctx.author.send(f"{oGame.name} - steam didn't give expected infos, this game will be ignored")
 
                 # Once we are sure the game exist in db, tie it to user profil
                 if oGame.multiplayer:
@@ -137,9 +141,9 @@ class Import(commands.Cog, name='Direct messages commands'):
                 embed.set_field_at(1, name='Processed Games:', value=counter['imported'])
                 embed.set_field_at(2, name='Multiplayer Games:', value=counter['multi'])
                 await progress.edit(embed=embed)
-        except UserWarning as err:
-            await ctx.author.send(f"{oGame.name} - {err}")
         except Exception as err:
+            await owner.send(f"{oGame.name} - err")
+            await ctx.author.send(f"{oGame.name} - Encountered exception, the dev has been notified")
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             self.logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
