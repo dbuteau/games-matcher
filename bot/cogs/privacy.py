@@ -2,9 +2,13 @@ import logging
 from textwrap import dedent
 import discord
 from discord.ext import commands
-from libs.models import Users, Games, UserGames, Servers, Base, WhosUp
+from libs.models import (
+    Users,
+    UserGames,
+)
 
-class Privacy(commands.Cog):
+
+class Privacy(commands.Cog, name='Direct messages commands'):
     """ Control how bot interact with your privacy """
     def __init__(self, bot, db):
         self.bot = bot
@@ -12,7 +16,9 @@ class Privacy(commands.Cog):
 
     @commands.group(pass_context=True, cog_name='Privacy')
     async def privacy(self, ctx):
-        """ `help privacy` for more infos """
+        """ (DM only)Control how bot interact with your privacy
+            `help privacy` for more infos
+        """
         nl = "\n"
         if isinstance(ctx.channel, discord.channel.DMChannel):
             if ctx.invoked_subcommand is None:
@@ -22,6 +28,7 @@ class Privacy(commands.Cog):
             await ctx.author.send('You should send privacy commands in private message')
 
     @privacy.command()
+    @commands.dm_only()
     async def status(self, ctx):
         """ display what the bot know about you """
         query = self.db.query(Users).filter(Users.user_id == ctx.author.id)
@@ -54,16 +61,17 @@ class Privacy(commands.Cog):
             await ctx.author.send(embed=embed)
 
     @privacy.command()
+    @commands.dm_only()
     async def disallow(self, ctx):
         """ the bot stop to listen your activity """
         query = self.db.query(Users).filter(Users.user_id == ctx.author.id)
         oUser = query.one()
         if oUser.disallow_globally:
             oUser.disallow_globally = False
-            await ctx.channel.send('Your Activity collect is now reactivated')
+            await ctx.author.send('Your Activity collect is now reactivated')
         else:
             oUser.disallow_globally = True
-            await ctx.channel.send('Your Activity collect is now disallowed')
+            await ctx.author.send('Your Activity collect is now disallowed')
         self.db.commit()
 
     @privacy.command()

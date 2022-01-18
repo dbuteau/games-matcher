@@ -1,31 +1,38 @@
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import (
+    Table,
     Column,
     Integer,
     String,
     Boolean,
     ForeignKey,
+    Date,
     DateTime,
     UnicodeText,
     create_engine,
     PrimaryKeyConstraint,
     or_
 )
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql.schema import MetaData
 
+engine = create_engine('sqlite:///data/games-matcher-bot.db')
 Base = declarative_base()
-
 
 class Games(Base):
     """
     List of all games
     """
-    __tablename__ = "Games"
-    game_id     = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    name        = Column(String(100), unique=True, nullable=False)
-    igdb_id     = Column(Integer, unique=True, nullable=True)
-    steam_id    = Column(Integer, unique=True, nullable=True)
-    discord_id  = Column(Integer, unique=True, nullable=True)
-    multiplayer = Column(Boolean, nullable=True)
+    __tablename__= 'Games'
+    game_id      = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    name         = Column(String(100), unique=True, nullable=False)
+    release_date = Column(Date, nullable=True) # added in v0.0.3
+    igdb_id      = Column(Integer, unique=True, nullable=True)
+    steam_id     = Column(Integer, unique=True, nullable=True)
+    discord_id   = Column(Integer, unique=True, nullable=True)
+    multiplayer  = Column(Boolean, nullable=True)
+
+    def __repr__(self):
+        return str(self.__dict__)
 
 
 class Users(Base):
@@ -37,7 +44,6 @@ class Users(Base):
     disallow_globally = Column(Boolean, default=False)
     disallow_users = Column(UnicodeText, default=None)
 
-
 class Servers(Base):
     """
     Guild configuration
@@ -45,7 +51,6 @@ class Servers(Base):
     __tablename__ = "Servers"
     server_id = Column(Integer, primary_key=True)
     prefix = Column(String(1), default="$")
-
 
 class UserGames(Base):
     """
