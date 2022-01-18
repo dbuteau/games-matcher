@@ -40,7 +40,7 @@ class Import(commands.Cog, name='Direct messages commands'):
                 result['multiplayer'] = False
                 if gameInfos['categories']:
                     for category in gameInfos['categories']:
-                        if category['id'] in (1, 9):
+                        if category['id'] in (1, 9, 36, 38):
                             self.logger.debug(f"{gameInfos['name']} is multiplayer")
                             result['multiplayer'] = True
                 if gameInfos['release_date']['date'] != '':
@@ -91,7 +91,13 @@ class Import(commands.Cog, name='Direct messages commands'):
                 # if we miss some game info, then we ask steam store for it,
                 # warning the api is very sensible to 'too much request'
                 gameInfos = None
-                if query.count() == 0 or (query.count() == 1 and query.one().multiplayer is None):
+                if query.count() > 1:
+                    # if more than one row is found, need human investigation
+                    err = f"game_id={oGame.steam_id} name={oGame.name} got possible duplicate"
+                    raise Exception from err
+                if query.count() == 1 and query.one().multiplayer:
+                    counter['multi'] += 1
+                else:
                     await asyncio.sleep(1)
                     details = await self.get_gameinfos(oGame.steam_id)
                     if details:
@@ -100,33 +106,23 @@ class Import(commands.Cog, name='Direct messages commands'):
                     else:
                         self.logger.info(f"{game['name'].lower()} not found in steam store")
                         await ctx.author.send(f"{oGame.name} - not found in steam store API")
-                elif query.count() == 1 and query.one().multiplayer:
-                    counter['multi'] += 1
 
-                if query.count() == 0:
-                    # insert into db if not exist
-                    self.logger.info(f"add {oGame.name} game to database")
-                    self._db.add(oGame)
-                    self._db.commit()
-                elif query.count() == 1:
-                    gameindb = query.one()
-                    gameindb.steam_id = oGame.steam_id
-                    if gameInfos is not None and gameindb.multiplayer is None:
-                        gameindb.multiplayer = oGame.multiplayer
-                    self._db.commit()
-                    self.logger.info(f"update game #{gameindb.game_id}/{oGame.steam_id}: {oGame.name}")
-                elif query.count() > 1:
-                    # if more than one row is found, need human investigation
-                    err = f"game_id={oGame.steam_id} name={oGame.name} got possible duplicate"
-                    self.logger.error(err)
-                    await owner.send(err)
+                    if query.count() == 0:
+                        # insert into db if not exist
+                        self._db.add(oGame)
+                        self._db.commit()
+                        self.logger.info(f"add {oGame.name} game to database")
+                    elif query.count() == 1:
+                        gameindb = query.one()
+                        gameindb.steam_id = oGame.steam_id
+                        if gameInfos is not None and gameindb.multiplayer is None:
+                            gameindb.multiplayer = oGame.multiplayer
+                        self._db.commit()
+                        self.logger.info(f"update game #{gameindb.game_id}/{oGame.steam_id}: {oGame.name}")
 
                 # refresh request
                 oGame = query.one()
                 self._db.refresh(oGame)
-
-                if oGame.multiplayer is None:
-                    await ctx.author.send(f"{oGame.name} - steam didn't give expected infos, this game will be ignored")
 
                 # Once we are sure the game exist in db, tie it to user profil
                 if oGame.multiplayer:
