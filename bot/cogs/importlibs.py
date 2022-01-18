@@ -105,7 +105,7 @@ class Import(commands.Cog, name='Direct messages commands'):
                         oGame.multiplayer = details['multiplayer']
                     else:
                         self.logger.info(f"{game['name'].lower()} not found in steam store")
-                        await ctx.author.send(f"{oGame.name} - not found in steam store API")
+                        await ctx.author.send(f"{oGame.name} - not found in steam store API(ID:{oGame.steam_id})")
 
                     if query.count() == 0:
                         # insert into db if not exist
