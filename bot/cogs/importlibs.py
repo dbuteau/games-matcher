@@ -2,7 +2,9 @@ import os
 import sys
 import discord
 import dateutil.parser
+import locale
 import logging
+import re 
 import asyncio
 from discord.ext import commands
 from discord.ext.commands.cooldowns import BucketType
@@ -44,6 +46,9 @@ class Import(commands.Cog, name='Direct messages commands'):
                             self.logger.debug(f"{gameInfos['name']} is multiplayer")
                             result['multiplayer'] = True
                 if gameInfos['release_date']['date'] != '':
+                    locale.setlocale(locale.LC_TIME, 'en_US.UTF-8')
+                    if bool(re.search('[\u0400-\u04FF]', gameInfos['release_date']['date'])):
+                        locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
                     result['release_date'] = dateutil.parser.parse(gameInfos['release_date']['date'])
                     self.logger.info(f"{gameInfos['release_date']['date']} converted to {result['release_date']}")
                 else:
@@ -53,7 +58,7 @@ class Import(commands.Cog, name='Direct messages commands'):
         except Exception as err:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            self.logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
+            self.logger.error(f'{fname}({exc_tb.tb_lineno}): ID {steam_id} - {err}')
 
     @library.command(usage='your_steam_id')
     @commands.max_concurrency(1, per=BucketType.default, wait=True)
