@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import textwrap
 import asyncio
 from datetime import (
     datetime
@@ -26,14 +27,6 @@ class Commands(commands.Cog, name='Channel commands'):
         self.bot = bot
         self.db = db
         self.logger = logging.getLogger('discord')
-
-    @commands.group(pass_context=True, hidden=True)
-    async def test(self, ctx):
-        """
-        dummy group for allowing wrote to dev server bot
-        without erroring the prod one
-        """
-        pass
 
     @commands.command()
     @commands.guild_only()
@@ -73,7 +66,9 @@ class Commands(commands.Cog, name='Channel commands'):
     @commands.command()
     @commands.guild_only()
     async def match(self, ctx, member: discord.Member):
-        """ @user : Find commons game between you and @user """
+        """ Find commons game between you and @user 
+            example: match @morkit84566
+        """
         try:
             logging.info(
                 f'found common games between {ctx.author.id} and {member.id}')
@@ -114,39 +109,38 @@ class Commands(commands.Cog, name='Channel commands'):
     @commands.command()
     @commands.guild_only()
     async def find(self, ctx, *, game_name: str):
-        """ game_name : find members which own the 'game name' """
+        """ find members which own the 'game name' 
+            example: WOG "Total Warhammer III"
+        """
         try:
             self.logger.debug('command find called')
             member_list = []
             embed = discord.Embed(title=f'Search Members owning "{game_name}"')
             search = game_name.lower()
             query = self.db.query(Games.name)\
-                    .filter(Games.name.like(f'{search}'))
-            self.logger.debug(f'found {query.count()} games for "{search}"')
-            if query.count() > 1:
+                    .filter(Games.name.like(search))
+            nbresult = query.count()
+            self.logger.debug(f'found {nbresult}({type(nbresult)}) games for "{search}"')
+
+            if nbresult == 1:
+                users = self.db.query(UserGames.user_id).join(Games).filter(Games.name.like(search)).all()
+                for user in users:
+                    member = discord.utils.find(lambda m: m.id == user.user_id, ctx.guild.members)
+                    if member:
+                        member_list.append(member.display_name)
+                self.logger.debug(f'found {len(users)} members on total {len(member_list)}')
+                if len(member_list) > 0:
+                    embed.add_field(name='Result', value='\n'.join(member_list))
+                else:
+                    embed.add_field(name="Result",value='Sorry found no one on this server owning this game')
+                await ctx.channel.send(embed=embed)
+            elif nbresult > 1:
                 embed.description = "Please be more specific your term returned multiple results."
-                if query.count() <= 10:
+                if nbresult <= 10:
                     embed.add_field(name='Choices',value='\n'.join([r for r, in query.all()]))
                     await ctx.channel.send(embed=embed)
                 else:
                     await interntools.paginate(ctx, [r for r, in query.all()], header=embed.description)
-            elif query.count() == 1:
-                users = self.db.query(UserGames.user_id).join(Games)\
-                    .filter(Games.name == search).all()
-                for user in users:
-                    if not user.user_id == ctx.author.id:
-                        member = discord.utils.find(
-                            lambda m: m.id == user.user_id,
-                            ctx.guild.members)
-                        if member:
-                            member_list.append(member.display_name)
-                if len(member_list) > 0:
-                    embed.add_field(name='Result', value='\n'.join(member_list))
-                else:
-                    embed.add_field(
-                        name="Result",
-                        value='Sorry found no one here owning this game')
-                await ctx.channel.send(embed=embed)
             else:
                 embed.add_field(
                     name="Result",
@@ -164,8 +158,9 @@ class Commands(commands.Cog, name='Channel commands'):
     @commands.command()
     @commands.guild_only()
     async def up(self, ctx, time=30):
-        """ time : Signal you are up for game session,
-            the offer expire in <time> minutes (30 by default)"""
+        """ Signal than for X next minutes you'r free for game session,
+            example: up 120
+        """
         header = f'{ctx.author.name} is ready to play'
         footer = f"*Say you want to play too typing `{ctx.prefix}up`*"
         nl = '\n'
@@ -230,71 +225,114 @@ class Commands(commands.Cog, name='Channel commands'):
 
     @commands.command()
     @commands.guild_only()
-    async def lfg(self, ctx, *, param: str):
-        """ (ex: lfg valheim 10)say you're looking <nb>(default 2)
-            players for <game name>. Message is deleted after 30mn
-            When <nb players> have reacted to the message it will
-            create voice channel with member in it
-        """
+    async def GPN(self,ctx):
+        # todo
+        """ Games Played Now : currently played games list on the guild server """
         try:
-            match = re.match(r"([\w|\s]+) (\d*)", param, re.I)
-            if match:
-                game, nb_players = match.groups()
-                nb_players = int(nb_players)
+            gamesList = {}
+            for user in ctx.guild.members:
+                if user.status == discord.Status.online and user.activity.type == 'playing':
+                    gamesList[user.activity.name] = (gamesList[user.activity.name] or 0) + 1
+            embedModel = discord.Embed(
+                title='Members are currently playing to')
+            for game, player in gamesList:
+                embedModel.add_field(game,player,True)
+            else:
+                embedModel.add_field('Nothing, absolutly nothing','')
+            await ctx.channel.send(embed=embed, delete_after=(30*60))
+        except Exception as err:
+            self.logger.error(f'lfg command raised an exception; {err}')
+
+    @commands.command()
+    @commands.guild_only()
+    async def lfg(self, ctx, *, params: str):
+        """ Lean For Group of X persons (offer expire after 30mn)
+            Example: lfg total war III 4
+            When nb players have reacted to the message it automaticly create voice channel with member in it
+        """
+        def check(reaction: discord.Reaction, user, remove=False):
+            try: 
+                nonlocal userUpList
+
+                if str(reaction.emoji) == '👍': 
+                    if remove:
+                        userUpList.remove(user)
+                    else:
+                        userUpList.append(user)
+                if str(reaction.emoji) == '🏁' and user == ctx.author:
+                    asyncio.create_task(moveToVoiceChannel(chanName=f'{user.display_name}-{game}', usersList=userUpList))
+                    asyncio.create_task(lfgmsg.delete())
+                    return
+                if str(reaction.emoji) == '❌' and user == ctx.author:
+                    asyncio.create_task(lfgmsg.delete())
+                    return
+
+                rn = "\n"
+                if len(userUpList) >= nb_players:
+                    asyncio.create_task(moveToVoiceChannel(chanName=f'{user.display_name}-{game}', usersList=userUpList))
+                    asyncio.create_task(lfgmsg.delete())
+                else:
+                    embed.set_field_at(messageField1, name='Nb Players wanted', value=f'{len(userUpList)}/{nb_players}', inline=True)
+                    embed.set_field_at(messageField2, name='Players in group', value=f'{rn.jpoin(userUpList)}', inline=False)
+                    asyncio.create_task(update_embed(embed))
+                return
+            except Exception as err:
+                self.logger.error(f'lfg command raised an exception at line {sys.exc_info()[-1].tb_lineno}; {err}')
+
+        async def moveToVoiceChannel(chanName, usersList):
+            try:
+                # create the voice channel
+                overwrites = {
+                    ctx.message.author: discord.PermissionOverwrite(connect=True, mute_members=True, move_members=True,
+                                                        manage_channels=True)
+                }
+                for user in usersList:
+                    await user.move_to(f'{chanName}', overwrites=overwrites, user_limit=nb_players, reason='bot found a group for playing')
+            except discord.Forbidden:
+                await ctx.channel.send("Sorry i don't have permissions to create voice channel, you have to create yourself or use existing one")
+            except Exception as err:
+                self.logger.error(f'lfg command raised an exception at line {sys.exc_info()[-1].tb_lineno}; {err}')
+
+        async def update_embed(embed):
+            await lfgmsg.edit(embed=embed)
+
+        try:
+            game, nb_players = re.match(r"(?:\")*([\w|\s]+)(?:\")* (\d*)", params, re.I).groups()
+            nb_players = int(nb_players)
+
             embedModel = discord.Embed(
                 title=f'{ctx.author.display_name} is searching for a group!',
-                color=0xff0000
-                )
+                color=0xff0000)
             embedModel.add_field(name='Game', value=f'{game}', inline=True)
-            footer = 'react with 👍 if you are interested to join.\nWhen the number of players wanted is reached a voice channel will be created and persons whom reacted automaticly join the channel'
-            embedModel.set_footer(text=footer)
-
-            userlist = []
-            userlist.append(ctx.author)
+            footer = """
+            react with 👍 if you are interested to join.
+            When the number of players wanted is reached a voice channel will be created and persons whom reacted automaticly join the channel.
+            For lfg author:
+            - 🏁 reaction skip the wait and invite people in the list to voice channel
+            - ❌ reaction cancel and delete the lfg
+            """
+            embedModel.set_footer(text=textwrap.dedent(footer))
 
             embed = embedModel
-            embed.add_field(name='Nb Players wanted', value=f'{len(userlist)}/{nb_players or 2}', inline=True)
+            messageField1 = embed.add_field(name='Nb Players wanted', value=f'1/{nb_players}', inline=True)
+            messageField2 = embed.add_field(name='Players in group:', value=f'{ctx.author.display_name}', inline=False)
             await ctx.message.delete()
 
             lfgmsg = await ctx.channel.send(embed=embed, delete_after=(30*60))
 
-            async def update_embed(embed):
-                await lfgmsg.edit(embed=embed)
+            userUpList = []
+            userUpList.append(ctx.author)
 
-            def check(reaction, user):
-                self.logger.info(reaction)
-                if str(reaction.emoji) == '👍':  # and user.id != ctx.author.id:
-                    if len(userlist) <= nb_players:
-                        userlist.append(user)
-                        embed = embedModel
-                        embed.add_field(
-                            name='Nb Players wanted',
-                            value=f'{reaction.count + 1}/{nb_players or 2}', inline=True)
-                        asyncio.create_task(update_embed(embed))
-                    if len(userlist) == nb_players:
-                        # check if channel is already existing with same name
-                        channels = ctx.guild.fetch_channels()
-                        nbChan = 1
-                        chanName = f'{game}'
-                        for chan in channels:
-                            if isinstance(chan, VoiceChannel):
-                                if chan.name == game:
-                                    chanName = f'{game}_{nbChan}'
-                                if chan.name == f'{game}_{nbChan}':
-                                    nbChan += 1
-                        # create the voice channel
-                        channel = ctx.guild.create_voice_channel(f'{chanName}', user_limit=nb_players)
-                        for user in userlist:
-                            user.move_to(channel)
-                        lfgmsg.delete()
-            reaction, user = await self.bot.wait_for('reaction_add', timeout=(30*60), check=check)
-            reaction, user = await self.bot.wait_for('raw_reaction_remove', timeout=(30*60), check=check)
+            def remove(reaction: discord.Reaction, user):
+                check(reaction, user, remove=True)
+
+            # Listening for reaction changes on the message
+            await self.bot.wait_for(event='reaction_add', timeout=(30*60), check=check)
+            await self.bot.wait_for('raw_reaction_remove', timeout=(30*60), check=remove)
         except asyncio.TimeoutError:
             await lfgmsg.delete()
-        except discord.Forbidden:
-            await ctx.channel.send("Sorry i don't have permissions to create voice channel, you have to create yourself or use existing one")
         except Exception as err:
-            self.logger.error(f'lfg command raised an exception; {err}')
+            self.logger.error(f'lfg command raised an exception at line {sys.exc_info()[-1].tb_lineno}; {err}')
 
 
 class Both(commands.Cog, name='Misc.'):

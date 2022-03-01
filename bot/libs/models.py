@@ -30,6 +30,7 @@ class Games(Base):
     steam_id     = Column(Integer, unique=True, nullable=True)
     discord_id   = Column(Integer, unique=True, nullable=True)
     multiplayer  = Column(Boolean, nullable=True)
+    is_game      = Column(Boolean, default=True) # added in v0.0.10
 
     def __repr__(self):
         return str(self.__dict__)
@@ -51,6 +52,7 @@ class Servers(Base):
     __tablename__ = "Servers"
     server_id = Column(Integer, primary_key=True)
     prefix = Column(String(1), default="$")
+    banned = Column(Boolean, default=False) # added in v0.0.10
 
 class UserGames(Base):
     """

@@ -45,12 +45,8 @@ class Import(commands.Cog, name='Direct messages commands'):
                         if category['id'] in (1, 9, 36, 38):
                             self.logger.debug(f"{gameInfos['name']} is multiplayer")
                             result['multiplayer'] = True
-                if gameInfos['release_date']['date'] != '':
-                    locale.setlocale(locale.LC_TIME, 'en_US.UTF-8')
-                    if bool(re.search('[\u0400-\u04FF]', gameInfos['release_date']['date'])):
-                        locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+                if gameInfos['release_date']['date']:
                     result['release_date'] = dateutil.parser.parse(gameInfos['release_date']['date'])
-                    self.logger.info(f"{gameInfos['release_date']['date']} converted to {result['release_date']}")
                 else:
                     self.logger.info(f"[{gameInfos['name']}#{steam_id}] {gameInfos['release_date']} return is none")
                     result['release_date'] = None
@@ -110,7 +106,7 @@ class Import(commands.Cog, name='Direct messages commands'):
                         oGame.multiplayer = details['multiplayer']
                     else:
                         self.logger.info(f"{game['name'].lower()} not found in steam store")
-                        await ctx.author.send(f"{oGame.name} - not found in steam store API(ID:{oGame.steam_id})")
+                        await ctx.author.send(f"{oGame.name} is no more in Steam store (ID:{oGame.steam_id}) i can't know the game details")
 
                     if query.count() == 0:
                         # insert into db if not exist
