@@ -18,11 +18,11 @@ class Steam:
     def get_User_Owned_Games(self, steam_id):
         try:
             # check if the bot can access to the profile
-            query = self._session.get(f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?steamids={steam_id}")
+            query = self._session.get(f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?l=english&steamids={steam_id}")
             visibility = json.loads(query.content)['response']['players'][0]['communityvisibilitystate']
             self.whoIimport = json.loads(query.content)['response']['players'][0]['personaname']
             if visibility != 1:
-                result = self._session.get(f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?&steamid={steam_id}&include_appinfo=1&include_played_free_games=1")
+                result = self._session.get(f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?l=english&steamid={steam_id}&include_appinfo=1&include_played_free_games=1")
                 logging.debug(result.content)
                 if hasattr(result, 'content'):
                     return json.loads(result.content)
@@ -43,7 +43,7 @@ class Steam:
 
     def get_game_info_from_store(self, game_id):
         try:
-            req = self._session.get(f'https://store.steampowered.com/api/appdetails?appids={game_id}')
+            req = self._session.get(f'https://store.steampowered.com/api/appdetails?l=english&appids={game_id}')
             result = json.loads(req.content)
             if result[f'{game_id}']:
                 if result[str(game_id)]['success'] is True:

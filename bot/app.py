@@ -7,12 +7,13 @@ import os
 import sys
 import datetime
 import logging
+import asyncio
 from sqlalchemy import (
     or_
 )
 from sqlalchemy.orm import sessionmaker
 from alembic.config import Config
-from alembic import command
+from alembic import command, context
 from discord import (
     Intents,
     Activity,
@@ -62,7 +63,9 @@ global prefix
 
 
 def define_prefix(bot=None, message=None):
+    # Warning '!dev:' prefix is reserved for
     prefix = os.environ.get('BOT_PREFIX') or '$'
+    
     return prefix
 
 
@@ -75,16 +78,11 @@ bot = commands.Bot(
 
 async def default_presence():
     try:
-        if define_prefix() != '$test:':
+        if define_prefix() != '!dev:':
             await bot.change_presence(
                 activity=Activity(
                     type=ActivityType.watching,
                     name=f"{define_prefix()}help"))
-        else:
-            await bot.change_presence(
-                activity=Activity(
-                    type=ActivityType.watching,
-                    name="$help"))
     except Exception as err:
         exc_tb = sys.exc_info()[2]
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -120,8 +118,8 @@ async def on_command_error(ctx, error):
                 delete_after=30)
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.author.send(
-                "This command require argument(s), you forgot to give, see \
-                `$help <command>` to see what argument it needs",
+                f"This command require argument(s), you forgot to give, see \
+                `{define_prefix()}help <command>` to see what argument it needs",
                 delete_after=30)
             await ctx.message.delete()
         elif isinstance(error, UserWarning):
@@ -172,9 +170,9 @@ async def on_ready():
         for guild in my_guilds:
             me_onguild = guild.me
             logger.info(
-                f'{me_onguild} listening "{define_prefix()}" on {guild.name}')
+                f'{me_onguild} listening "{define_prefix()}" on {guild.id}:{guild.name}')
         logger.info(f"Log Level is set to { logging.getLogger('discord') }")
-        await owner.send('Well Hello there!')
+        await owner.send(f"{version}: Well Hello there!  i'm listening to {define_prefix()} commands")
     except Exception as err:
         exc_tb = sys.exc_info()[2]
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -211,7 +209,7 @@ async def on_member_update(before, after):
                     db.commit()
                     db.refresh(oGames)
                 elif query.count() > 1:
-                    raise RuntimeError('Duplicate game: {activity.name.lower}')
+                    raise RuntimeError(f'Duplicate game: {activity.name.lower}')
                 else:
                     oGames = query.one()
                     if hasattr(activity, 'application_id'):
@@ -219,8 +217,6 @@ async def on_member_update(before, after):
                         db.commit()
                         db.refresh(oGames)
 
-                """ we don't save the fact than this user own the game if he
-                    didn't allow bot to do it """
                 query = db.query(Users).filter(Users.user_id == after.id)
                 if query.count() > 0:
                     oUser = query.one()
@@ -230,6 +226,8 @@ async def on_member_update(before, after):
                     db.commit()
                     db.refresh(oUser)
 
+                """ we don't save the fact than this user own the game if he
+                    didn't allow bot to do it """
                 if not oUser.disallow_globally:
                     query = db.query(UserGames).filter(
                         UserGames.game_id == oGames.game_id,
@@ -260,28 +258,41 @@ def run_migrations() -> None:
     try:
         alembic_cfg = Config("alembic.ini")
         command.upgrade(alembic_cfg, 'head')
+        context.configure()
     except Exception as err:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
 
 
-if __name__ == '__main__':
+async def loadPlugins(bot, db):
+    try:
+        await bot.add_cog(pubcommands.Commands(bot, db))
+        await bot.add_cog(pubcommands.Both(bot, db))
+        await bot.add_cog(importlibs.Import(bot, db))
+        await bot.add_cog(privacy.Privacy(bot, db))
+        await bot.add_cog(owner.SuperAdmin(bot, db))
+    except Exception as err:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
+
+
+async def main():
     try:
         run_migrations()
         logger.info("Migration ended")
 
         """ loading Cogs """
-        bot.add_cog(pubcommands.Commands(bot, db))
-        bot.add_cog(pubcommands.Both(bot, db))
-        bot.add_cog(importlibs.Import(bot, db))
-        bot.add_cog(privacy.Privacy(bot, db))
-        bot.add_cog(owner.SuperAdmin(bot, db))
+        await loadPlugins(bot, db)
 
         bot.help_command.cog = bot.cogs["Misc."]
 
-        bot.run(os.environ['DISCORD_TOKEN'], bot=True, reconnect=True)
+        await bot.start(os.environ['DISCORD_TOKEN'], reconnect=True)
     except Exception as err:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logger.error(f'{fname}({exc_tb.tb_lineno}): {err}')
+
+if __name__ == '__main__':
+    asyncio.run(main())

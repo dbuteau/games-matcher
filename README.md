@@ -66,3 +66,6 @@ services:
             DISCORD_TOKEN: <insert your Discord token HERE>
             STEAM_API_KEY: <insert your STEAM API key HERE>
 ```
+
+# thanks to
+- https://discordpy.readthedocs.io/en/stable/
