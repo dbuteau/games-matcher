@@ -13,7 +13,7 @@ from libs.api.steam import Steam
 from libs.models import Games, UserGames
 
 
-class Import(commands.Cog, name='Direct messages commands'):
+class Import(commands.Cog, name='Import games from lib messages commands'):
     self = None
 
     def __init__(self, bot, db):
